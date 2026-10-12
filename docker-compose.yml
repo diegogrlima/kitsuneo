@@ -1,0 +1,51 @@
+name: kitsuneo
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-kitsuneo}
+      POSTGRES_USER: ${POSTGRES_USER:-kitsuneo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    # Runs with the host user's UID so it can read secrets.json (mode 600)
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Development is required for ASP.NET Core to load user-secrets
+      ASPNETCORE_ENVIRONMENT: Development
+      HOME: /home/host
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB:-kitsuneo};Username=${POSTGRES_USER:-kitsuneo};Gss Encryption Mode=Disable
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      # Database:Password comes from the host's user-secrets (UserSecretsId: kitsuneo-api)
+      - ${USER_SECRETS_DIR:-${HOME}/.microsoft/usersecrets}/kitsuneo-api:/home/host/.microsoft/usersecrets/kitsuneo-api:ro
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+
+volumes:
+  postgres-data:
