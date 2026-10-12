@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Kitsuneo.API/Kitsuneo.API.csproj" />
+    <Project Path="src/Kitsuneo.Application/Kitsuneo.Application.csproj" />
+    <Project Path="src/Kitsuneo.Core/Kitsuneo.Core.csproj" />
+    <Project Path="src/Kitsuneo.Infrastructure/Kitsuneo.Infrastructure.csproj" />
+  </Folder>
+</Solution>
