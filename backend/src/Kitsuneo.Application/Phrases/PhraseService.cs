@@ -1,4 +1,5 @@
 using Kitsuneo.Application.Abstractions;
+using Kitsuneo.Application.Common;
 using Kitsuneo.Application.Users;
 using Kitsuneo.Core.Entities;
 using Kitsuneo.Core.Enums;
@@ -7,6 +8,9 @@ namespace Kitsuneo.Application.Phrases;
 
 public sealed class PhraseService(IPhraseRepository repository)
 {
+    public const int DefaultPageSize = 20;
+    public const int MaxPageSize = 100;
+
     public async Task<PhraseResponse> CreateAsync(CreatePhraseRequest request, CancellationToken cancellationToken = default)
     {
         var phrase = Phrase.Create(
@@ -33,13 +37,24 @@ public sealed class PhraseService(IPhraseRepository repository)
             : PhraseResponse.FromEntity(phrase);
     }
 
-    public async Task<IReadOnlyList<PhraseResponse>> ListAsync(
+    public async Task<CursorPage<PhraseResponse>> ListAsync(
         Language? language = null,
         string? search = null,
+        PhraseCursor? after = null,
+        int pageSize = DefaultPageSize,
         CancellationToken cancellationToken = default)
     {
-        var phrases = await repository.ListAsync(DefaultUser.Id, language, search, cancellationToken);
+        pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        return phrases.Select(PhraseResponse.FromEntity).ToList();
+        // One extra row tells whether there is a next page without a COUNT query
+        var phrases = await repository.ListAsync(
+            DefaultUser.Id, pageSize + 1, language, search, after, cancellationToken);
+
+        var page = phrases.Take(pageSize).ToList();
+        var nextCursor = phrases.Count > pageSize
+            ? new PhraseCursor(page[^1].CreatedAt, page[^1].Id).Encode()
+            : null;
+
+        return new CursorPage<PhraseResponse>(page.Select(PhraseResponse.FromEntity).ToList(), nextCursor);
     }
 }

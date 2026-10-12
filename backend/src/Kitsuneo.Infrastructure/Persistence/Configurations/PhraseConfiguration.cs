@@ -19,9 +19,8 @@ public class PhraseConfiguration : IEntityTypeConfiguration<Phrase>
         builder.Property(p => p.UserId)
             .IsRequired();
 
+        // Stored as text through the enum convention in AppDbContext
         builder.Property(p => p.Language)
-            .HasConversion<string>()
-            .HasMaxLength(20)
             .IsRequired();
 
         builder.Property(p => p.Text)
@@ -44,6 +43,11 @@ public class PhraseConfiguration : IEntityTypeConfiguration<Phrase>
         builder.Property(p => p.CreatedAt)
             .IsRequired();
 
-        builder.HasIndex(p => new { p.UserId, p.Language });
+        // Serve the list query: filter by user (and language), ordered by (CreatedAt, Id) for keyset pagination
+        builder.HasIndex(p => new { p.UserId, p.CreatedAt, p.Id })
+            .HasFilter("\"IsArchived\" = false");
+
+        builder.HasIndex(p => new { p.UserId, p.Language, p.CreatedAt, p.Id })
+            .HasFilter("\"IsArchived\" = false");
     }
 }

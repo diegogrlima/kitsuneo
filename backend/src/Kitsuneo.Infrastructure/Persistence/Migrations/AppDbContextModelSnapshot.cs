@@ -35,8 +35,8 @@ namespace Kitsuneo.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Language")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("Reading")
                         .HasMaxLength(500)
@@ -61,7 +61,11 @@ namespace Kitsuneo.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId", "Language");
+                    b.HasIndex("UserId", "CreatedAt", "Id")
+                        .HasFilter("\"IsArchived\" = false");
+
+                    b.HasIndex("UserId", "Language", "CreatedAt", "Id")
+                        .HasFilter("\"IsArchived\" = false");
 
                     b.ToTable("phrases", (string)null);
                 });

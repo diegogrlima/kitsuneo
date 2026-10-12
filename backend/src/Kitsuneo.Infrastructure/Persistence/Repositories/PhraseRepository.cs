@@ -1,4 +1,5 @@
 using Kitsuneo.Application.Abstractions;
+using Kitsuneo.Application.Phrases;
 using Kitsuneo.Core.Entities;
 using Kitsuneo.Core.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -11,17 +12,21 @@ public sealed class PhraseRepository(AppDbContext context) : IPhraseRepository
         await context.Phrases.AddAsync(phrase, cancellationToken);
 
     public Task<Phrase?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
-        context.Phrases.FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        context.Phrases
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
 
     public async Task<IReadOnlyList<Phrase>> ListAsync(
         Guid userId,
+        int limit,
         Language? language = null,
         string? search = null,
+        PhraseCursor? after = null,
         CancellationToken cancellationToken = default)
     {
         var query = context.Phrases
             .AsNoTracking()
-            .Where(p => p.UserId == userId);
+            .Where(p => p.UserId == userId && !p.IsArchived);
 
         if (language is not null)
             query = query.Where(p => p.Language == language);
@@ -31,13 +36,19 @@ public sealed class PhraseRepository(AppDbContext context) : IPhraseRepository
             var pattern = $"%{EscapeLikePattern(search.Trim())}%";
             query = query.Where(p =>
                 EF.Functions.ILike(p.Text, pattern, LikeEscape) ||
-                EF.Functions.ILike(p.SpokenForm, pattern, LikeEscape) ||
-                (p.Reading != null && EF.Functions.ILike(p.Reading, pattern, LikeEscape)) ||
                 (p.Translation != null && EF.Functions.ILike(p.Translation, pattern, LikeEscape)));
         }
 
+        // Keyset pagination: (CreatedAt, Id) < (cursor) reads the index from the cursor on, unlike OFFSET
+        if (after is not null)
+            query = query.Where(p => EF.Functions.LessThan(
+                ValueTuple.Create(p.CreatedAt, p.Id),
+                ValueTuple.Create(after.CreatedAt, after.Id)));
+
         return await query
             .OrderByDescending(p => p.CreatedAt)
+            .ThenByDescending(p => p.Id)
+            .Take(limit)
             .ToListAsync(cancellationToken);
     }
 

@@ -17,7 +17,7 @@ namespace Kitsuneo.Infrastructure.Persistence.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Language = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    Language = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
                     Text = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     SpokenForm = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     Reading = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
