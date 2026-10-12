@@ -5,4 +5,7 @@
     <Project Path="src/Kitsuneo.Core/Kitsuneo.Core.csproj" />
     <Project Path="src/Kitsuneo.Infrastructure/Kitsuneo.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Kitsuneo.Core.Tests/Kitsuneo.Core.Tests.csproj" />
+  </Folder>
 </Solution>
