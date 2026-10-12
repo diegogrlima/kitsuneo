@@ -10,11 +10,13 @@ Kitsuneo/
 │   └── src/app/                    # App Router
 └── backend/                        # API (ASP.NET Core)
     ├── Kitsuneo.slnx               # Solution
-    └── src/
-        ├── Kitsuneo.API/           # Camada de apresentação (controllers, configuração)
-        ├── Kitsuneo.Application/   # Casos de uso e regras de aplicação
-        ├── Kitsuneo.Core/          # Domínio (entidades, interfaces)
-        └── Kitsuneo.Infrastructure/ # Acesso a dados e serviços externos
+    ├── src/
+    │   ├── Kitsuneo.API/           # Camada de apresentação (controllers, configuração)
+    │   ├── Kitsuneo.Application/   # Casos de uso e regras de aplicação
+    │   ├── Kitsuneo.Core/          # Domínio (entidades, interfaces)
+    │   └── Kitsuneo.Infrastructure/ # Acesso a dados e serviços externos
+    └── tests/
+        └── Kitsuneo.Core.Tests/    # Testes unitários do domínio (xUnit + FluentAssertions)
 ```
 
 ### Dependências entre projetos do backend
@@ -30,7 +32,8 @@ API ──► Application ──► Core
 | Camada   | Stack                                              |
 | -------- | -------------------------------------------------- |
 | Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4   |
-| Backend  | .NET 10, ASP.NET Core Web API, OpenAPI             |
+| Backend  | .NET 10, ASP.NET Core Web API, OpenAPI, EF Core + PostgreSQL |
+| Testes   | xUnit, FluentAssertions                            |
 
 ## Pré-requisitos
 
@@ -124,6 +127,7 @@ Em ambiente de desenvolvimento, o documento OpenAPI fica em `/openapi/v1.json`.
 | `npm run build`            | `frontend` | Build de produção           |
 | `npm run lint`             | `frontend` | Lint com ESLint             |
 | `dotnet build`             | `backend`  | Compila a solution          |
+| `dotnet test`              | `backend`  | Executa os testes unitários |
 | `dotnet watch --project src/Kitsuneo.API` | `backend` | Executa com hot reload |
 
 ## Convenção de commits

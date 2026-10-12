@@ -1,1 +1,34 @@
 @Kitsuneo.API_HostAddress = http://localhost:5243
+
+### Create an English phrase
+# @name createEnglish
+POST {{Kitsuneo.API_HostAddress}}/api/v1/phrases
+Content-Type: application/json
+Accept: application/json
+
+{
+  "language": "English",
+  "text": "Nice to meet you",
+  "translation": "Prazer em conhecê-lo"
+}
+
+### Create a Japanese phrase with reading
+POST {{Kitsuneo.API_HostAddress}}/api/v1/phrases
+Content-Type: application/json
+Accept: application/json
+
+{
+  "language": "Japanese",
+  "text": "猫が好きです",
+  "spokenForm": "ねこがすきです",
+  "reading": "neko ga suki desu",
+  "translation": "Eu gosto de gatos"
+}
+
+### Get a phrase by id (uses the id returned by the first request)
+GET {{Kitsuneo.API_HostAddress}}/api/v1/phrases/{{createEnglish.response.body.$.id}}
+Accept: application/json
+
+### List phrases, optionally filtered by language and search term
+GET {{Kitsuneo.API_HostAddress}}/api/v1/phrases?language=Japanese&search=猫
+Accept: application/json

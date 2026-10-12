@@ -1,4 +1,6 @@
+using Kitsuneo.Application.Abstractions;
 using Kitsuneo.Infrastructure.Persistence;
+using Kitsuneo.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,13 +15,14 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
-        // The password is kept out of appsettings and comes from user-secrets (Database:Password).
         var builder = new NpgsqlConnectionStringBuilder(connectionString)
         {
             Password = configuration["Database:Password"]
         };
 
         services.AddDbContext<AppDbContext>(options => options.UseNpgsql(builder.ConnectionString));
+
+        services.AddScoped<IPhraseRepository, PhraseRepository>();
 
         return services;
     }
