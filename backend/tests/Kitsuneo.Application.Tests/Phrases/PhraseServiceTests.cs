@@ -115,46 +115,81 @@ public class PhraseServiceTests
     public async Task ListAsync_WithFilters_QueriesDefaultUserAndPassesFilters()
     {
         using var cts = new CancellationTokenSource();
-        _repository.ListAsync(Arg.Any<Guid>(), Arg.Any<Language?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns(Array.Empty<Phrase>());
+        var after = new PhraseCursor(DateTime.UtcNow, Guid.NewGuid());
+        ArrangeList(Array.Empty<Phrase>());
 
-        await _service.ListAsync(Language.Japanese, "ねこ", cts.Token);
+        await _service.ListAsync(Language.Japanese, "ねこ", after, 10, cts.Token);
 
-        await _repository.Received(1).ListAsync(DefaultUser.Id, Language.Japanese, "ねこ", cts.Token);
+        await _repository.Received(1).ListAsync(DefaultUser.Id, 11, Language.Japanese, "ねこ", after, cts.Token);
     }
 
     [Fact]
-    public async Task ListAsync_WithoutFilters_PassesNullFilters()
+    public async Task ListAsync_WithoutArguments_UsesDefaultPageSizeAndNullFilters()
     {
-        _repository.ListAsync(Arg.Any<Guid>(), Arg.Any<Language?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns(Array.Empty<Phrase>());
+        ArrangeList(Array.Empty<Phrase>());
 
         await _service.ListAsync();
 
-        await _repository.Received(1).ListAsync(DefaultUser.Id, null, null, Arg.Any<CancellationToken>());
+        await _repository.Received(1).ListAsync(
+            DefaultUser.Id, PhraseService.DefaultPageSize + 1, null, null, null, Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(-5, 1)]
+    [InlineData(1000, PhraseService.MaxPageSize)]
+    public async Task ListAsync_WithPageSizeOutOfRange_ClampsIt(int pageSize, int expected)
+    {
+        ArrangeList(Array.Empty<Phrase>());
+
+        await _service.ListAsync(pageSize: pageSize);
+
+        await _repository.Received(1).ListAsync(
+            DefaultUser.Id, expected + 1, null, null, null, Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task ListAsync_ReturnsMappedPhrasesInRepositoryOrder()
+    public async Task ListAsync_WhenRepositoryReturnsAtMostPageSize_ReturnsLastPage()
     {
         var newest = Phrase.Create(DefaultUser.Id, Language.Japanese, "日本語", reading: "にほんご");
         var oldest = Phrase.Create(DefaultUser.Id, Language.English, "Hello");
-        _repository.ListAsync(DefaultUser.Id, null, null, Arg.Any<CancellationToken>())
-            .Returns(new[] { newest, oldest });
+        ArrangeList(newest, oldest);
 
-        var response = await _service.ListAsync();
+        var page = await _service.ListAsync(pageSize: 2);
 
-        response.Should().Equal(PhraseResponse.FromEntity(newest), PhraseResponse.FromEntity(oldest));
+        page.Items.Should().Equal(PhraseResponse.FromEntity(newest), PhraseResponse.FromEntity(oldest));
+        page.NextCursor.Should().BeNull();
     }
 
     [Fact]
-    public async Task ListAsync_WhenRepositoryReturnsNothing_ReturnsEmptyList()
+    public async Task ListAsync_WhenRepositoryReturnsExtraRow_DropsItAndPointsCursorAtLastItem()
     {
-        _repository.ListAsync(Arg.Any<Guid>(), Arg.Any<Language?>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns(Array.Empty<Phrase>());
+        var phrases = Enumerable.Range(0, 3)
+            .Select(i => Phrase.Create(DefaultUser.Id, Language.English, $"Phrase {i}"))
+            .ToArray();
+        ArrangeList(phrases);
 
-        var response = await _service.ListAsync();
+        var page = await _service.ListAsync(pageSize: 2);
 
-        response.Should().BeEmpty();
+        page.Items.Select(p => p.Id).Should().Equal(phrases[0].Id, phrases[1].Id);
+        PhraseCursor.TryDecode(page.NextCursor!, out var cursor).Should().BeTrue();
+        cursor.Should().Be(new PhraseCursor(phrases[1].CreatedAt, phrases[1].Id));
     }
+
+    [Fact]
+    public async Task ListAsync_WhenRepositoryReturnsNothing_ReturnsEmptyLastPage()
+    {
+        ArrangeList(Array.Empty<Phrase>());
+
+        var page = await _service.ListAsync();
+
+        page.Items.Should().BeEmpty();
+        page.NextCursor.Should().BeNull();
+    }
+
+    private void ArrangeList(params Phrase[] phrases) =>
+        _repository.ListAsync(
+                Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<Language?>(), Arg.Any<string?>(),
+                Arg.Any<PhraseCursor?>(), Arg.Any<CancellationToken>())
+            .Returns(phrases);
 }
