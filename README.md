@@ -47,7 +47,51 @@ npm install
 
 O script `prepare` ativa automaticamente o hook `commit-msg`, que valida as mensagens de commit.
 
-## Como executar
+## Ambiente Docker
+
+O `docker-compose.yml` sobe o PostgreSQL 18, o backend e o frontend.
+
+| Serviço    | URL                                  |
+| ---------- | ------------------------------------ |
+| Frontend   | http://localhost:3000                |
+| Backend    | http://localhost:8080                |
+| Health     | http://localhost:8080/health         |
+| OpenAPI    | http://localhost:8080/openapi/v1.json |
+| PostgreSQL | `localhost:5432`                     |
+
+### Segredos
+
+Nenhum dado sensível fica versionado:
+
+- **Senha do banco na API:** fica no [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) do .NET (`UserSecretsId: kitsuneo-api`), na chave `Database:Password`. O `appsettings.json` guarda apenas a connection string sem senha.
+- **Senha do contêiner PostgreSQL:** fica no arquivo `.env` da raiz (ignorado pelo git), na variável `POSTGRES_PASSWORD`. Os dois valores devem ser iguais.
+
+No Docker, o diretório do user-secrets do host é montado como somente leitura no contêiner do backend, que roda em `Development` para carregá-lo.
+
+### Primeira execução
+
+```bash
+# 1. Variáveis do Docker Compose
+cp .env.example .env
+# edite o .env: defina POSTGRES_PASSWORD e, se necessário, HOST_UID/HOST_GID (id -u / id -g)
+
+# 2. Mesma senha no user-secrets da API
+dotnet user-secrets set "Database:Password" "<mesma senha do .env>" --project backend/src/Kitsuneo.API
+
+# 3. Subir o ambiente
+docker compose up -d --build
+```
+
+Comandos úteis:
+
+```bash
+docker compose logs -f backend   # logs de um serviço
+docker compose up -d postgres    # apenas o banco (para rodar a API/frontend fora do Docker)
+docker compose down              # para os contêineres
+docker compose down -v           # para e apaga o volume do banco
+```
+
+## Como executar sem Docker
 
 ### Frontend
 
@@ -60,6 +104,8 @@ npm run dev
 Disponível em http://localhost:3000.
 
 ### Backend
+
+Requer o PostgreSQL rodando (por exemplo, `docker compose up -d postgres`) e o user-secret `Database:Password` configurado.
 
 ```bash
 cd backend
