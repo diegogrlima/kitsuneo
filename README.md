@@ -37,6 +37,16 @@ API ──► Application ──► Core
 - [Node.js](https://nodejs.org/) 20+
 - [.NET SDK](https://dotnet.microsoft.com/download) 10
 
+## Configuração inicial
+
+Na raiz do repositório, instale as dependências de tooling (Husky + commitlint):
+
+```bash
+npm install
+```
+
+O script `prepare` ativa automaticamente o hook `commit-msg`, que valida as mensagens de commit.
+
 ## Como executar
 
 ### Frontend
@@ -78,7 +88,10 @@ Este repositório segue o padrão [Conventional Commits](https://www.conventiona
 <tipo>(<escopo opcional>): <descrição>
 ```
 
-Tipos mais comuns: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `build`, `ci`.
-Escopos sugeridos: `frontend`, `backend`.
+Tipos permitidos: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+Escopos permitidos (opcionais): `frontend`, `backend`, `ci`, `deps`, `repo`.
+
+As mensagens são validadas pelo [commitlint](https://commitlint.js.org/) localmente (hook do Husky) e no CI.
+Para adicionar escopos, edite `commitlint.config.mjs`.
 
 Exemplo: `feat(backend): adiciona endpoint de autenticação`
