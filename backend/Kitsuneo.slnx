@@ -8,5 +8,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/Kitsuneo.Application.Tests/Kitsuneo.Application.Tests.csproj" />
     <Project Path="tests/Kitsuneo.Core.Tests/Kitsuneo.Core.Tests.csproj" />
+    <Project Path="tests/Kitsuneo.Infrastructure.Tests/Kitsuneo.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>
