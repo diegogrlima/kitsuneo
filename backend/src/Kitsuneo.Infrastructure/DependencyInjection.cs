@@ -1,4 +1,4 @@
-using Kitsuneo.Core.Repositories;
+using Kitsuneo.Application.Abstractions;
 using Kitsuneo.Infrastructure.Persistence;
 using Kitsuneo.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
