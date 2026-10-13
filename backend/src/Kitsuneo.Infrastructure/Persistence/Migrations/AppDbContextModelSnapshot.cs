@@ -69,6 +69,51 @@ namespace Kitsuneo.Infrastructure.Persistence.Migrations
 
                     b.ToTable("phrases", (string)null);
                 });
+
+            modelBuilder.Entity("Kitsuneo.Core.Entities.ReviewSchedule", b =>
+                {
+                    b.Property<Guid>("PhraseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<double?>("Difficulty")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime>("DueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double?>("Stability")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int?>("Step")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PhraseId");
+
+                    b.ToTable("review_schedules", (string)null);
+                });
+
+            modelBuilder.Entity("Kitsuneo.Core.Entities.ReviewSchedule", b =>
+                {
+                    b.HasOne("Kitsuneo.Core.Entities.Phrase", null)
+                        .WithOne("ReviewSchedule")
+                        .HasForeignKey("Kitsuneo.Core.Entities.ReviewSchedule", "PhraseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kitsuneo.Core.Entities.Phrase", b =>
+                {
+                    b.Navigation("ReviewSchedule")
+                        .IsRequired();
+                });
 #pragma warning restore 612, 618
         }
     }
