@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Monorepo do Kitsuneo (Next.js + ASP.NET Core)",
+  "license": "MIT",
   "scripts": {
     "prepare": "husky"
   },

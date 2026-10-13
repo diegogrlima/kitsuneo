@@ -1,6 +1,8 @@
 # Kitsuneo
 
-Monorepo do projeto Kitsuneo, contendo o frontend em Next.js e o backend em ASP.NET Core.
+Kitsuneo é um app para salvar e estudar frases em inglês e japonês, com leitura, forma falada e tradução.
+
+Monorepo do projeto, contendo o frontend em Next.js e o backend em ASP.NET Core.
 
 ## Estrutura
 
