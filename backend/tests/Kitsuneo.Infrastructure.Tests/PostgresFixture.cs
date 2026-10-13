@@ -1,5 +1,6 @@
 using Kitsuneo.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Testcontainers.PostgreSql;
 
 namespace Kitsuneo.Infrastructure.Tests;
@@ -20,10 +21,18 @@ public sealed class PostgresFixture : IAsyncLifetime
         await context.Database.MigrateAsync();
     }
 
-    public AppDbContext CreateContext() => new(
-        new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(_container.GetConnectionString())
-            .Options);
+    /// <param name="database">Another database in the same container, created by migrating it; defaults to the shared one.</param>
+    public AppDbContext CreateContext(string? database = null)
+    {
+        var connectionString = new NpgsqlConnectionStringBuilder(_container.GetConnectionString());
+        if (database is not null)
+            connectionString.Database = database;
+
+        return new AppDbContext(
+            new DbContextOptionsBuilder<AppDbContext>()
+                .UseNpgsql(connectionString.ConnectionString)
+                .Options);
+    }
 
     public Task DisposeAsync() => _container.DisposeAsync().AsTask();
 }

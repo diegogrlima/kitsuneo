@@ -2,6 +2,7 @@ using FluentAssertions;
 using Kitsuneo.Application.Phrases;
 using Kitsuneo.Core.Entities;
 using Kitsuneo.Core.Enums;
+using Kitsuneo.Core.Scheduling;
 using Kitsuneo.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -119,6 +120,56 @@ public class PhraseRepositoryTests(PostgresFixture fixture)
 
         expectedOrder.Should().BeEquivalentTo(phrases.Select(p => p.Id));
         pagedIds.Should().Equal(expectedOrder);
+    }
+
+    [Fact]
+    public async Task AddAsync_SavesReviewScheduleWithPhrase()
+    {
+        var phrase = NewPhrase("New");
+        await SeedAsync(phrase);
+
+        var stored = await GetAsync(phrase.Id);
+
+        stored!.ReviewSchedule.Should().BeEquivalentTo(new
+        {
+            PhraseId = phrase.Id,
+            State = ReviewState.Learning,
+            Step = 0,
+            Stability = (double?)null,
+            Difficulty = (double?)null,
+            DueAt = stored.CreatedAt,
+            LastReviewedAt = (DateTime?)null
+        });
+    }
+
+    [Fact]
+    public async Task ListAsync_LoadsReviewSchedules()
+    {
+        await SeedAsync(NewPhrase("First"), NewPhrase("Second"));
+
+        var phrases = await ListAsync();
+
+        phrases.Should().HaveCount(2).And.OnlyContain(p => p.ReviewSchedule != null && p.ReviewSchedule.PhraseId == p.Id);
+    }
+
+    [Fact]
+    public async Task SaveChangesAsync_AfterReview_PersistsSchedule()
+    {
+        var phrase = NewPhrase("Reviewed");
+        await SeedAsync(phrase);
+        var reviewedAt = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var scheduler = new FsrsScheduler(new FsrsOptions { EnableFuzzing = false });
+
+        await using (var context = fixture.CreateContext())
+        {
+            var tracked = await context.Phrases.SingleAsync(p => p.Id == phrase.Id);
+            tracked.ReviewSchedule.Review(scheduler, ReviewRating.Easy, reviewedAt);
+            await context.SaveChangesAsync();
+        }
+
+        var stored = await GetAsync(phrase.Id);
+        stored!.ReviewSchedule.ToCard().Should().Be(
+            new FsrsCard(ReviewState.Review, null, 8.2956, 1.0, reviewedAt.AddDays(8), reviewedAt));
     }
 
     [Fact]

@@ -16,6 +16,7 @@ public sealed class Phrase
     public string? Translation { get; private set; }
     public bool IsArchived { get; private set; }
     public DateTime CreatedAt { get; private set; }
+    public ReviewSchedule ReviewSchedule { get; private set; } = null!;
 
     private Phrase() { }
 
@@ -32,9 +33,12 @@ public sealed class Phrase
 
         var content = PhraseContent.Create(language, text, spokenForm, reading, translation);
 
+        var id = Guid.CreateVersion7();
+        var createdAt = DateTime.UtcNow;
+
         return new Phrase
         {
-            Id = Guid.CreateVersion7(),
+            Id = id,
             UserId = userId,
             Language = content.Language,
             Text = content.Text,
@@ -42,7 +46,8 @@ public sealed class Phrase
             Reading = content.Reading,
             Translation = content.Translation,
             IsArchived = false,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = createdAt,
+            ReviewSchedule = ReviewSchedule.Create(id, createdAt)
         };
     }
 }

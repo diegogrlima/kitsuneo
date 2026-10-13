@@ -6,6 +6,7 @@ namespace Kitsuneo.Infrastructure.Persistence;
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<Phrase> Phrases => Set<Phrase>();
+    public DbSet<ReviewSchedule> ReviewSchedules => Set<ReviewSchedule>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -43,6 +43,16 @@ public class PhraseConfiguration : IEntityTypeConfiguration<Phrase>
         builder.Property(p => p.CreatedAt)
             .IsRequired();
 
+        builder.HasOne(p => p.ReviewSchedule)
+            .WithOne()
+            .HasForeignKey<ReviewSchedule>(s => s.PhraseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Every phrase has a schedule, so it is always loaded with it
+        builder.Navigation(p => p.ReviewSchedule)
+            .IsRequired()
+            .AutoInclude();
+
         // Serve the list query: filter by user (and language), ordered by (CreatedAt, Id) for keyset pagination
         builder.HasIndex(p => new { p.UserId, p.CreatedAt, p.Id })
             .HasFilter("\"IsArchived\" = false");
