@@ -18,7 +18,10 @@ Kitsuneo/
     │   ├── Kitsuneo.Core/          # Domínio (entidades, interfaces)
     │   └── Kitsuneo.Infrastructure/ # Acesso a dados e serviços externos
     └── tests/
-        └── Kitsuneo.Core.Tests/    # Testes unitários do domínio (xUnit + FluentAssertions)
+        ├── Kitsuneo.Core.Tests/            # Testes unitários do domínio (xUnit + FluentAssertions)
+        ├── Kitsuneo.Application.Tests/     # Testes dos casos de uso, com repositórios falsos (NSubstitute)
+        ├── Kitsuneo.Infrastructure.Tests/  # Testes de integração com PostgreSQL real (Testcontainers)
+        └── Kitsuneo.API.Tests/             # Testes da API inteira em memória (WebApplicationFactory + Testcontainers)
 ```
 
 ### Dependências entre projetos do backend
@@ -71,9 +74,33 @@ Nenhum dado sensível fica versionado:
 - **Senha do banco na API:** fica no [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) do .NET (`UserSecretsId: kitsuneo-api`), na chave `Database:Password`. O `appsettings.json` guarda apenas a connection string sem senha.
 - **Senha do contêiner PostgreSQL:** fica no arquivo `.env` da raiz (ignorado pelo git), na variável `POSTGRES_PASSWORD`. Os dois valores devem ser iguais.
 
+- **Chave de assinatura do JWT:** fica no user-secrets da API, na chave `Jwt:SigningKey`, com pelo menos 32 caracteres. É obrigatória: sem ela a API não sobe e diz o que falta.
 - **Chave do ElevenLabs (voz):** fica no user-secrets da API, na chave `ElevenLabs:ApiKey`. É opcional: sem ela, o resto da API funciona e só o endpoint de áudio responde `503`.
 
 No Docker, o diretório do user-secrets do host é montado como somente leitura no contêiner do backend, que roda em `Development` para carregá-lo.
+
+### Contas e autenticação
+
+Cada usuário tem a própria conta e só vê as próprias frases. Toda a API exige login, exceto `/health` e as rotas de cadastro, login e refresh.
+
+| Rota | O que faz |
+| ---- | --------- |
+| `POST /api/v1/auth/register` | Cria a conta (e-mail e senha de 8 a 128 caracteres) e já faz login |
+| `POST /api/v1/auth/login` | Login com e-mail e senha |
+| `POST /api/v1/auth/refresh` | Troca o refresh token por um novo access token |
+| `POST /api/v1/auth/logout` | Encerra a sessão |
+| `GET /api/v1/auth/me` | Dados do usuário logado |
+
+Como funciona:
+
+- **Senhas:** guardadas só como hash PBKDF2 (HMAC-SHA512, salt aleatório, 100 mil iterações), pelo `PasswordHasher` do ASP.NET Core Identity. Login com e-mail desconhecido ou senha errada dá a mesma resposta (`401`), para não revelar quais e-mails existem.
+- **Access token:** JWT assinado (HS256) que vale 15 minutos. Vai no corpo da resposta e deve ser enviado em `Authorization: Bearer <token>`.
+- **Refresh token:** valor aleatório que vale 14 dias. Vai num cookie `HttpOnly`, `Secure` e `SameSite=Strict`, limitado a `/api/v1/auth`, e no banco fica só o hash dele. A cada refresh ele é trocado por um novo (rotação). Se um refresh token já trocado for usado de novo, é sinal de que vazou, e a sessão inteira é revogada.
+- **Logout e blacklist:** o logout revoga a sessão do refresh token e coloca o access token atual numa blacklist (`revoked_access_tokens`). A blacklist é consultada a cada requisição, até o token expirar. Entradas de tokens já expirados são apagadas automaticamente.
+- **Força bruta:** cadastro, login e refresh aceitam 10 requisições por minuto por IP (`Auth:RateLimitPerMinute`); acima disso, `429`.
+- **CORS:** o frontend em `http://localhost:3000` pode chamar a API com cookies (`Cors:AllowedOrigins`).
+
+A migration `AddUsersAndAuth` apaga as frases criadas antes das contas existirem (com agendas e tentativas), porque elas não tinham dono.
 
 ### Voz com IA (ElevenLabs)
 
@@ -101,8 +128,9 @@ Voz, modelo e demais opções podem ser trocados na seção `ElevenLabs` da conf
 cp .env.example .env
 # edite o .env: defina POSTGRES_PASSWORD e, se necessário, HOST_UID/HOST_GID (id -u / id -g)
 
-# 2. Mesma senha no user-secrets da API
+# 2. Mesma senha no user-secrets da API, e uma chave aleatória para assinar os JWT
 dotnet user-secrets set "Database:Password" "<mesma senha do .env>" --project backend/src/Kitsuneo.API
+dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)" --project backend/src/Kitsuneo.API
 
 # 3. Subir o ambiente
 docker compose up -d --build
@@ -131,7 +159,7 @@ Disponível em http://localhost:3000.
 
 ### Backend
 
-Requer o PostgreSQL rodando (por exemplo, `docker compose up -d postgres`) e o user-secret `Database:Password` configurado.
+Requer o PostgreSQL rodando (por exemplo, `docker compose up -d postgres`) e os user-secrets `Database:Password` e `Jwt:SigningKey` configurados.
 
 ```bash
 cd backend

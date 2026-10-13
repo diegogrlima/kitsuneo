@@ -23,7 +23,8 @@ public class AddReviewSchedulesMigrationTests(PostgresFixture fixture)
             VALUES ({phraseId}, {Guid.NewGuid()}, 'English', 'Old phrase', 'Old phrase', false, {createdAt})
             """);
 
-        await migrator.MigrateAsync();
+        // Stops at this migration: AddUsersAndAuth, later on, drops phrases owned by no account
+        await migrator.MigrateAsync("AddReviewSchedules");
 
         var schedule = await context.ReviewSchedules.AsNoTracking().SingleAsync();
         schedule.Should().BeEquivalentTo(new

@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Kitsuneo.Application.Abstractions;
 using Kitsuneo.Application.Reviews;
-using Kitsuneo.Application.Users;
 using Kitsuneo.Core.Entities;
 using Kitsuneo.Core.Enums;
 using Kitsuneo.Core.Exceptions;
@@ -12,6 +11,8 @@ namespace Kitsuneo.Application.Tests.Reviews;
 
 public class ReviewServiceTests
 {
+    private static readonly Guid UserId = Guid.NewGuid();
+
     private static readonly DateTime Now = new(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
 
     private readonly IReviewRepository _repository = Substitute.For<IReviewRepository>();
@@ -22,14 +23,15 @@ public class ReviewServiceTests
         _service = new ReviewService(
             _repository,
             new FsrsScheduler(new FsrsOptions { EnableFuzzing = false }),
-            new FixedTimeProvider(Now));
+            new FixedTimeProvider(Now),
+            new FakeCurrentUser(UserId));
     }
 
     [Fact]
-    public async Task ListDueAsync_QueriesDefaultUserAtCurrentTime()
+    public async Task ListDueAsync_QueriesCurrentUserAtCurrentTime()
     {
-        var phrase = Phrase.Create(DefaultUser.Id, Language.English, "Hello");
-        _repository.ListDueAsync(DefaultUser.Id, Now, 20, Arg.Any<CancellationToken>()).Returns([phrase]);
+        var phrase = Phrase.Create(UserId, Language.English, "Hello");
+        _repository.ListDueAsync(UserId, Now, 20, Arg.Any<CancellationToken>()).Returns([phrase]);
 
         var due = await _service.ListDueAsync();
 
@@ -47,14 +49,14 @@ public class ReviewServiceTests
     {
         await _service.ListDueAsync(limit);
 
-        await _repository.Received(1).ListDueAsync(DefaultUser.Id, Now, expected, Arg.Any<CancellationToken>());
+        await _repository.Received(1).ListDueAsync(UserId, Now, expected, Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task ReviewAsync_WithOwnPhrase_AppliesRatingAndSaves()
     {
-        var phrase = Phrase.Create(DefaultUser.Id, Language.English, "Hello");
-        _repository.GetForReviewAsync(phrase.Id, DefaultUser.Id, Arg.Any<CancellationToken>()).Returns(phrase);
+        var phrase = Phrase.Create(UserId, Language.English, "Hello");
+        _repository.GetForReviewAsync(phrase.Id, UserId, Arg.Any<CancellationToken>()).Returns(phrase);
 
         var schedule = await _service.ReviewAsync(phrase.Id, new ReviewRequest(ReviewRating.Easy));
 

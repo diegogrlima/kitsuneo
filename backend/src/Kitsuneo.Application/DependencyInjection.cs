@@ -1,3 +1,4 @@
+using Kitsuneo.Application.Auth;
 using Kitsuneo.Application.Phrases;
 using Kitsuneo.Application.Practice;
 using Kitsuneo.Application.Reviews;
@@ -12,6 +13,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        services.AddScoped<AuthService>();
         services.AddScoped<PhraseService>();
         services.AddScoped<ReviewService>();
         services.AddScoped<PracticeService>();

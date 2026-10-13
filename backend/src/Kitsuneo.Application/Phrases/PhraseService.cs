@@ -1,12 +1,11 @@
 using Kitsuneo.Application.Abstractions;
 using Kitsuneo.Application.Common;
-using Kitsuneo.Application.Users;
 using Kitsuneo.Core.Entities;
 using Kitsuneo.Core.Enums;
 
 namespace Kitsuneo.Application.Phrases;
 
-public sealed class PhraseService(IPhraseRepository repository)
+public sealed class PhraseService(IPhraseRepository repository, ICurrentUser currentUser)
 {
     public const int DefaultPageSize = 20;
     public const int MaxPageSize = 100;
@@ -14,7 +13,7 @@ public sealed class PhraseService(IPhraseRepository repository)
     public async Task<PhraseResponse> CreateAsync(CreatePhraseRequest request, CancellationToken cancellationToken = default)
     {
         var phrase = Phrase.Create(
-            DefaultUser.Id,
+            currentUser.Id,
             request.Language,
             request.Text,
             request.SpokenForm,
@@ -32,7 +31,7 @@ public sealed class PhraseService(IPhraseRepository repository)
     {
         var phrase = await repository.GetByIdAsync(id, cancellationToken);
 
-        return phrase is null || phrase.UserId != DefaultUser.Id
+        return phrase is null || phrase.UserId != currentUser.Id
             ? null
             : PhraseResponse.FromEntity(phrase);
     }
@@ -47,12 +46,12 @@ public sealed class PhraseService(IPhraseRepository repository)
             request.Reading,
             request.Translation);
 
-        return await repository.UpdateAsync(id, DefaultUser.Id, content, cancellationToken);
+        return await repository.UpdateAsync(id, currentUser.Id, content, cancellationToken);
     }
 
     /// <summary>Returns false when the phrase does not exist, is archived or belongs to another user.</summary>
     public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
-        repository.DeleteAsync(id, DefaultUser.Id, cancellationToken);
+        repository.DeleteAsync(id, currentUser.Id, cancellationToken);
 
     public async Task<CursorPage<PhraseResponse>> ListAsync(
         Language? language = null,
@@ -65,7 +64,7 @@ public sealed class PhraseService(IPhraseRepository repository)
 
         // One extra row tells whether there is a next page without a COUNT query
         var phrases = await repository.ListAsync(
-            DefaultUser.Id, pageSize + 1, language, search, after, cancellationToken);
+            currentUser.Id, pageSize + 1, language, search, after, cancellationToken);
 
         var page = phrases.Take(pageSize).ToList();
         var nextCursor = phrases.Count > pageSize

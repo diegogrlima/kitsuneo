@@ -5,6 +5,9 @@ namespace Kitsuneo.Infrastructure.Persistence;
 
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
+    public DbSet<User> Users => Set<User>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<RevokedAccessToken> RevokedAccessTokens => Set<RevokedAccessToken>();
     public DbSet<Phrase> Phrases => Set<Phrase>();
     public DbSet<ReviewSchedule> ReviewSchedules => Set<ReviewSchedule>();
     public DbSet<PracticeAttempt> PracticeAttempts => Set<PracticeAttempt>();
