@@ -21,7 +21,7 @@ public class PhraseRepositoryTests(PostgresFixture fixture)
         var active = NewPhrase("Active");
         var archived = NewPhrase("Archived");
         await SeedAsync(active, archived);
-        await ArchiveAsync(archived.Id);
+        await DeleteAsync(archived.Id);
 
         var phrases = await ListAsync();
 
@@ -122,6 +122,18 @@ public class PhraseRepositoryTests(PostgresFixture fixture)
     }
 
     [Fact]
+    public async Task GetByIdAsync_WithArchivedPhrase_ReturnsNull()
+    {
+        var phrase = NewPhrase("Archived");
+        await SeedAsync(phrase);
+        await DeleteAsync(phrase.Id);
+
+        var stored = await GetAsync(phrase.Id);
+
+        stored.Should().BeNull();
+    }
+
+    [Fact]
     public async Task GetByIdAsync_WithUnknownId_ReturnsNull()
     {
         await SeedAsync(NewPhrase("Existing"));
@@ -130,6 +142,112 @@ public class PhraseRepositoryTests(PostgresFixture fixture)
         var phrase = await new PhraseRepository(context).GetByIdAsync(Guid.NewGuid());
 
         phrase.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithOwnPhrase_UpdatesContentAndKeepsOtherColumns()
+    {
+        var phrase = NewPhrase("Hello", translation: "Olá");
+        await SeedAsync(phrase);
+        var content = PhraseContent.Create(Language.Japanese, "猫", "ねこ", "ねこ", "Cat");
+
+        var updated = await UpdateAsync(phrase.Id, content);
+
+        updated.Should().BeTrue();
+        var stored = await GetAsync(phrase.Id);
+        stored.Should().BeEquivalentTo(new
+        {
+            phrase.Id,
+            UserId = _userId,
+            Language = Language.Japanese,
+            Text = "猫",
+            SpokenForm = "ねこ",
+            Reading = "ねこ",
+            Translation = "Cat",
+            IsArchived = false
+        });
+        stored!.CreatedAt.Should().BeCloseTo(phrase.CreatedAt, TimeSpan.FromMilliseconds(1));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithPhraseOfAnotherUser_ReturnsFalseAndLeavesItUnchanged()
+    {
+        var others = Phrase.Create(Guid.NewGuid(), Language.English, "Someone else's");
+        await SeedAsync(others);
+
+        var updated = await UpdateAsync(others.Id, PhraseContent.Create(Language.English, "Hijacked"));
+
+        updated.Should().BeFalse();
+        (await GetAsync(others.Id))!.Text.Should().Be("Someone else's");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithUnknownId_ReturnsFalse()
+    {
+        var updated = await UpdateAsync(Guid.NewGuid(), PhraseContent.Create(Language.English, "Hello"));
+
+        updated.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithArchivedPhrase_ReturnsFalseAndLeavesItUnchanged()
+    {
+        var phrase = NewPhrase("Archived");
+        await SeedAsync(phrase);
+        await DeleteAsync(phrase.Id);
+
+        var updated = await UpdateAsync(phrase.Id, PhraseContent.Create(Language.English, "Changed"));
+
+        updated.Should().BeFalse();
+        (await GetRowAsync(phrase.Id)).Text.Should().Be("Archived");
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithOwnPhrase_ArchivesItAndKeepsTheRow()
+    {
+        var deleted = NewPhrase("Delete me");
+        var kept = NewPhrase("Keep me");
+        await SeedAsync(deleted, kept);
+
+        var result = await DeleteAsync(deleted.Id);
+
+        result.Should().BeTrue();
+        (await GetRowAsync(deleted.Id)).IsArchived.Should().BeTrue();
+        (await GetRowAsync(kept.Id)).IsArchived.Should().BeFalse();
+        (await GetAsync(deleted.Id)).Should().BeNull();
+        (await ListAsync()).Select(p => p.Id).Should().Equal(kept.Id);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithArchivedPhrase_ReturnsFalse()
+    {
+        var phrase = NewPhrase("Delete me twice");
+        await SeedAsync(phrase);
+        await DeleteAsync(phrase.Id);
+
+        var result = await DeleteAsync(phrase.Id);
+
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithPhraseOfAnotherUser_ReturnsFalseAndKeepsIt()
+    {
+        var others = Phrase.Create(Guid.NewGuid(), Language.English, "Someone else's");
+        await SeedAsync(others);
+
+        var result = await DeleteAsync(others.Id);
+
+        result.Should().BeFalse();
+        (await GetRowAsync(others.Id)).IsArchived.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithUnknownId_ReturnsFalse()
+    {
+        var result = await DeleteAsync(Guid.NewGuid());
+
+        result.Should().BeFalse();
     }
 
     private Phrase NewPhrase(string text, string? translation = null) =>
@@ -146,19 +264,37 @@ public class PhraseRepositoryTests(PostgresFixture fixture)
         await repository.SaveChangesAsync();
     }
 
-    // The domain has no way to archive or backdate a phrase yet, so the tests write the columns directly
-    private async Task ArchiveAsync(Guid id)
-    {
-        await using var context = fixture.CreateContext();
-        await context.Phrases.Where(p => p.Id == id)
-            .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsArchived, true));
-    }
-
+    // The domain has no way to backdate a phrase, so the test writes the column directly
     private async Task SetCreatedAtAsync(Guid id, DateTime createdAt)
     {
         await using var context = fixture.CreateContext();
         await context.Phrases.Where(p => p.Id == id)
             .ExecuteUpdateAsync(s => s.SetProperty(p => p.CreatedAt, createdAt));
+    }
+
+    private async Task<bool> UpdateAsync(Guid id, PhraseContent content)
+    {
+        await using var context = fixture.CreateContext();
+        return await new PhraseRepository(context).UpdateAsync(id, _userId, content);
+    }
+
+    private async Task<bool> DeleteAsync(Guid id)
+    {
+        await using var context = fixture.CreateContext();
+        return await new PhraseRepository(context).DeleteAsync(id, _userId);
+    }
+
+    private async Task<Phrase?> GetAsync(Guid id)
+    {
+        await using var context = fixture.CreateContext();
+        return await new PhraseRepository(context).GetByIdAsync(id);
+    }
+
+    // Reads the row directly, archived or not
+    private async Task<Phrase> GetRowAsync(Guid id)
+    {
+        await using var context = fixture.CreateContext();
+        return await context.Phrases.AsNoTracking().SingleAsync(p => p.Id == id);
     }
 
     // A fresh context per call, so results come from the database and not from the change tracker

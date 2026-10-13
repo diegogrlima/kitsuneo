@@ -187,6 +187,60 @@ public class PhraseServiceTests
         page.NextCursor.Should().BeNull();
     }
 
+    [Fact]
+    public async Task UpdateAsync_WithValidRequest_UpdatesNormalizedContentOfDefaultUser()
+    {
+        var id = Guid.NewGuid();
+        using var cts = new CancellationTokenSource();
+        _repository.UpdateAsync(id, DefaultUser.Id, Arg.Any<PhraseContent>(), cts.Token).Returns(true);
+
+        var updated = await _service.UpdateAsync(id, new UpdatePhraseRequest(Language.English, " Hello ", Translation: "Olá"), cts.Token);
+
+        updated.Should().BeTrue();
+        await _repository.Received(1).UpdateAsync(
+            id,
+            DefaultUser.Id,
+            PhraseContent.Create(Language.English, "Hello", translation: "Olá"),
+            cts.Token);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WhenRepositoryFindsNoPhrase_ReturnsFalse()
+    {
+        _repository.UpdateAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<PhraseContent>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+
+        var updated = await _service.UpdateAsync(Guid.NewGuid(), new UpdatePhraseRequest(Language.English, "Hello"));
+
+        updated.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithInvalidRequest_ThrowsDomainExceptionAndDoesNotPersist()
+    {
+        var request = new UpdatePhraseRequest(Language.English, "Hello", Reading: "heh-loh");
+
+        var act = () => _service.UpdateAsync(Guid.NewGuid(), request);
+
+        await act.Should().ThrowAsync<DomainException>()
+            .WithMessage("Reading is only supported for Japanese phrases.");
+        await _repository.DidNotReceiveWithAnyArgs().UpdateAsync(default, default, default!, default);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task DeleteAsync_DeletesPhraseOfDefaultUserAndReturnsRepositoryResult(bool deleted)
+    {
+        var id = Guid.NewGuid();
+        using var cts = new CancellationTokenSource();
+        _repository.DeleteAsync(id, DefaultUser.Id, cts.Token).Returns(deleted);
+
+        var result = await _service.DeleteAsync(id, cts.Token);
+
+        result.Should().Be(deleted);
+    }
+
     private void ArrangeList(params Phrase[] phrases) =>
         _repository.ListAsync(
                 Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<Language?>(), Arg.Any<string?>(),
