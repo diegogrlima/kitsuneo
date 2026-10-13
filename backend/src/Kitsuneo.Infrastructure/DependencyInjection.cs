@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddDbContext<AppDbContext>(options => options.UseNpgsql(builder.ConnectionString));
 
         services.AddScoped<IPhraseRepository, PhraseRepository>();
+        services.AddScoped<IReviewRepository, ReviewRepository>();
 
         return services;
     }

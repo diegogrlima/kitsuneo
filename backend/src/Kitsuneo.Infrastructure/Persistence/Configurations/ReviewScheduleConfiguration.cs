@@ -19,5 +19,8 @@ public class ReviewScheduleConfiguration : IEntityTypeConfiguration<ReviewSchedu
 
         builder.Property(s => s.DueAt)
             .IsRequired();
+
+        // Serves the due queue, which reads schedules in DueAt order
+        builder.HasIndex(s => s.DueAt);
     }
 }
