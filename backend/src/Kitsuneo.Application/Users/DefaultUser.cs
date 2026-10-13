@@ -7,4 +7,7 @@ namespace Kitsuneo.Application.Users;
 public static class DefaultUser
 {
     public static readonly Guid Id = new("0199d8a4-7c3e-7000-8000-000000000001");
+
+    /// <summary>How many never-practiced phrases are introduced per UTC day.</summary>
+    public const int NewPhrasesPerDay = 10;
 }

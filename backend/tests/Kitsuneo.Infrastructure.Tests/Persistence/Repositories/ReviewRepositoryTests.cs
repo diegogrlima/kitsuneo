@@ -54,6 +54,59 @@ public class ReviewRepositoryTests(PostgresFixture fixture)
     }
 
     [Fact]
+    public async Task ListDueReviewsAsync_ReturnsOnlyReviewedDuePhrasesMostOverdueFirst()
+    {
+        var recent = await SeedAsync("Recent", Now.AddHours(-1), lastReviewedAt: Now.AddDays(-2));
+        var old = await SeedAsync("Old", Now.AddDays(-3), lastReviewedAt: Now.AddDays(-9));
+        await SeedAsync("Not due yet", Now.AddDays(1), lastReviewedAt: Now.AddDays(-1));
+        await SeedAsync("Never reviewed", Now.AddDays(-5));
+
+        var due = await ListDueReviewsAsync();
+
+        due.Select(p => p.Id).Should().Equal(old.Id, recent.Id);
+    }
+
+    [Fact]
+    public async Task ListDueReviewsAsync_FiltersLanguageAndExcludesArchivedAndOtherUsers()
+    {
+        var japanese = await SeedAsync("日本語", Now.AddDays(-1), lastReviewedAt: Now.AddDays(-2), language: Language.Japanese);
+        await SeedAsync("English", Now.AddDays(-1), lastReviewedAt: Now.AddDays(-2));
+        var archived = await SeedAsync("アーカイブ", Now.AddDays(-1), lastReviewedAt: Now.AddDays(-2), language: Language.Japanese);
+        await ArchiveAsync(archived.Id);
+        await SeedAsync("他人", Now.AddDays(-1), Guid.NewGuid(), Now.AddDays(-2), Language.Japanese);
+
+        var due = await ListDueReviewsAsync(Language.Japanese);
+
+        due.Select(p => p.Id).Should().Equal(japanese.Id);
+    }
+
+    [Fact]
+    public async Task ListNewAsync_ReturnsNeverReviewedPhrasesOldestFirstUpToLimit()
+    {
+        var first = await SeedAsync("First", Now, createdAt: Now.AddDays(-3));
+        var second = await SeedAsync("Second", Now, createdAt: Now.AddDays(-2));
+        await SeedAsync("Third", Now, createdAt: Now.AddDays(-1));
+        await SeedAsync("Reviewed", Now, lastReviewedAt: Now.AddDays(-1), createdAt: Now.AddDays(-4));
+
+        var fresh = await ListNewAsync(limit: 2);
+
+        fresh.Select(p => p.Id).Should().Equal(first.Id, second.Id);
+    }
+
+    [Fact]
+    public async Task ListNewAsync_FiltersLanguageAndExcludesArchived()
+    {
+        var japanese = await SeedAsync("日本語", Now, language: Language.Japanese);
+        await SeedAsync("English", Now);
+        var archived = await SeedAsync("アーカイブ", Now, language: Language.Japanese);
+        await ArchiveAsync(archived.Id);
+
+        var fresh = await ListNewAsync(language: Language.Japanese);
+
+        fresh.Select(p => p.Id).Should().Equal(japanese.Id);
+    }
+
+    [Fact]
     public async Task GetForReviewAsync_ThenSaveChanges_PersistsReview()
     {
         var phrase = await SeedAsync("Reviewed", Now);
@@ -97,16 +150,28 @@ public class ReviewRepositoryTests(PostgresFixture fixture)
         result.Should().BeNull();
     }
 
-    // Saves a new phrase and moves its schedule to dueAt
-    private async Task<Phrase> SeedAsync(string text, DateTime dueAt, Guid? userId = null)
+    // Saves a new phrase, then moves its schedule (and optionally its creation date) to the given values
+    private async Task<Phrase> SeedAsync(
+        string text,
+        DateTime dueAt,
+        Guid? userId = null,
+        DateTime? lastReviewedAt = null,
+        Language language = Language.English,
+        DateTime? createdAt = null)
     {
-        var phrase = Phrase.Create(userId ?? _userId, Language.English, text);
+        var phrase = Phrase.Create(userId ?? _userId, language, text);
 
         await using var context = fixture.CreateContext();
         context.Phrases.Add(phrase);
         await context.SaveChangesAsync();
         await context.ReviewSchedules.Where(s => s.PhraseId == phrase.Id)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.DueAt, dueAt));
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(x => x.DueAt, dueAt)
+                .SetProperty(x => x.LastReviewedAt, lastReviewedAt));
+
+        if (createdAt is not null)
+            await context.Phrases.Where(p => p.Id == phrase.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.CreatedAt, createdAt.Value));
 
         return phrase;
     }
@@ -121,5 +186,17 @@ public class ReviewRepositoryTests(PostgresFixture fixture)
     {
         await using var context = fixture.CreateContext();
         return await new ReviewRepository(context).ListDueAsync(_userId, Now, limit);
+    }
+
+    private async Task<IReadOnlyList<Phrase>> ListDueReviewsAsync(Language? language = null)
+    {
+        await using var context = fixture.CreateContext();
+        return await new ReviewRepository(context).ListDueReviewsAsync(_userId, Now, language);
+    }
+
+    private async Task<IReadOnlyList<Phrase>> ListNewAsync(int limit = 1000, Language? language = null)
+    {
+        await using var context = fixture.CreateContext();
+        return await new ReviewRepository(context).ListNewAsync(_userId, limit, language);
     }
 }

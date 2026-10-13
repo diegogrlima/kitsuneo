@@ -1,6 +1,6 @@
 namespace Kitsuneo.Core.Exceptions;
 
-public sealed class DomainException(string message) : Exception(message)
+public class DomainException(string message) : Exception(message)
 {
 
 }

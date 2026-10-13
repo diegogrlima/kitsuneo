@@ -198,6 +198,49 @@ public class FsrsSchedulerTests
     }
 
     [Fact]
+    public void Preview_NewCard_MatchesReferenceAndIncreasesFromAgainToEasy()
+    {
+        var preview = Scheduler.Preview(FsrsCard.New(T0), T0);
+
+        preview.Should().Be(new ReviewPreview(T0 + Minutes(1), T0 + Minutes(5.5), T0 + Minutes(10), T0 + Days(8)));
+    }
+
+    [Fact]
+    public void Preview_ReviewCard_IncreasesFromAgainToEasy()
+    {
+        var card = Scheduler.Review(FsrsCard.New(T0), Easy, T0);
+        var reviewedAt = card.DueAt;
+
+        var preview = Scheduler.Preview(card, reviewedAt);
+
+        preview.Again.Should().BeAfter(reviewedAt);
+        preview.Hard.Should().BeAfter(preview.Again);
+        preview.Good.Should().BeAfter(preview.Hard);
+        preview.Easy.Should().BeAfter(preview.Good);
+    }
+
+    [Fact]
+    public void Preview_DoesNotChangeCardAndIgnoresFuzzing()
+    {
+        // Fuzzing on: Preview must still give the unfuzzed dates, every time
+        var scheduler = new FsrsScheduler(random: new Random(1));
+        var card = Scheduler.Review(FsrsCard.New(T0), Easy, T0);
+        var copy = card with { };
+        var reviewedAt = card.DueAt;
+
+        var first = scheduler.Preview(card, reviewedAt);
+        var second = scheduler.Preview(card, reviewedAt);
+
+        card.Should().Be(copy);
+        second.Should().Be(first);
+        first.Should().Be(new ReviewPreview(
+            Scheduler.Review(card, Again, reviewedAt).DueAt,
+            Scheduler.Review(card, Hard, reviewedAt).DueAt,
+            Scheduler.Review(card, Good, reviewedAt).DueAt,
+            Scheduler.Review(card, Easy, reviewedAt).DueAt));
+    }
+
+    [Fact]
     public void Review_WithNonUtcTime_Throws()
     {
         var act = () => Scheduler.Review(FsrsCard.New(T0), Good, DateTime.SpecifyKind(T0, DateTimeKind.Local));

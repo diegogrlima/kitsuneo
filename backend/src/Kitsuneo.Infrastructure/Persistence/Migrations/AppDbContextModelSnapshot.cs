@@ -70,6 +70,59 @@ namespace Kitsuneo.Infrastructure.Persistence.Migrations
                     b.ToTable("phrases", (string)null);
                 });
 
+            modelBuilder.Entity("Kitsuneo.Core.Entities.PracticeAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<double>("Accuracy")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Answer")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DueAtAfter")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DueAtBefore")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DurationMs")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PhraseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PlayCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("RatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Rating")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<bool>("UsedSlowSpeed")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PhraseId", "CreatedAt");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("practice_attempts", (string)null);
+                });
+
             modelBuilder.Entity("Kitsuneo.Core.Entities.ReviewSchedule", b =>
                 {
                     b.Property<Guid>("PhraseId")
@@ -100,6 +153,15 @@ namespace Kitsuneo.Infrastructure.Persistence.Migrations
                     b.HasIndex("DueAt");
 
                     b.ToTable("review_schedules", (string)null);
+                });
+
+            modelBuilder.Entity("Kitsuneo.Core.Entities.PracticeAttempt", b =>
+                {
+                    b.HasOne("Kitsuneo.Core.Entities.Phrase", null)
+                        .WithMany()
+                        .HasForeignKey("PhraseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Kitsuneo.Core.Entities.ReviewSchedule", b =>

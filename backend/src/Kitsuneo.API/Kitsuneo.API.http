@@ -45,3 +45,30 @@ Accept: application/json
 {
   "rating": "Good"
 }
+
+### Practice flow 1/3: today's practice (due reviews, then up to 10 new phrases), optionally by language
+# @name today
+GET {{Kitsuneo.API_HostAddress}}/api/v1/practice/today?language=English
+Accept: application/json
+
+### Practice flow 2/3: submit what was typed for the first phrase of today's practice
+# @name attempt
+POST {{Kitsuneo.API_HostAddress}}/api/v1/phrases/{{today.response.body.$.items[0].phraseId}}/attempts
+Content-Type: application/json
+Accept: application/json
+
+{
+  "answer": "Nice to meet yo",
+  "playCount": 2,
+  "usedSlowSpeed": false,
+  "durationMs": 6500
+}
+
+### Practice flow 3/3: rate the attempt (Again, Hard, Good or Easy); rating it again returns 409
+POST {{Kitsuneo.API_HostAddress}}/api/v1/attempts/{{attempt.response.body.$.attemptId}}/rating
+Content-Type: application/json
+Accept: application/json
+
+{
+  "rating": "Good"
+}
