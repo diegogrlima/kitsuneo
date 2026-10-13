@@ -7,6 +7,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<Phrase> Phrases => Set<Phrase>();
     public DbSet<ReviewSchedule> ReviewSchedules => Set<ReviewSchedule>();
+    public DbSet<PracticeAttempt> PracticeAttempts => Set<PracticeAttempt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

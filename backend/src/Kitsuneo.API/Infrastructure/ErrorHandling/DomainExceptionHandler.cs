@@ -4,7 +4,10 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Kitsuneo.API.Infrastructure.ErrorHandling;
 
-/// <summary>Turns a <see cref="DomainException"/> into a 400 ProblemDetails response.</summary>
+/// <summary>
+/// Turns a <see cref="DomainException"/> into a ProblemDetails response:
+/// 409 for a <see cref="DomainConflictException"/>, 400 for any other.
+/// </summary>
 public sealed class DomainExceptionHandler(IProblemDetailsService problemDetailsService) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(
@@ -15,7 +18,11 @@ public sealed class DomainExceptionHandler(IProblemDetailsService problemDetails
         if (exception is not DomainException domainException)
             return false;
 
-        httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+        var (status, title) = domainException is DomainConflictException
+            ? (StatusCodes.Status409Conflict, "Conflict")
+            : (StatusCodes.Status400BadRequest, "Invalid request");
+
+        httpContext.Response.StatusCode = status;
 
         return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
         {
@@ -23,8 +30,8 @@ public sealed class DomainExceptionHandler(IProblemDetailsService problemDetails
             Exception = exception,
             ProblemDetails = new ProblemDetails
             {
-                Status = StatusCodes.Status400BadRequest,
-                Title = "Invalid request",
+                Status = status,
+                Title = title,
                 Detail = domainException.Message
             }
         });

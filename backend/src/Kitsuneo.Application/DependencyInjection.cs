@@ -1,4 +1,5 @@
 using Kitsuneo.Application.Phrases;
+using Kitsuneo.Application.Practice;
 using Kitsuneo.Application.Reviews;
 using Kitsuneo.Core.Scheduling;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +13,7 @@ public static class DependencyInjection
     {
         services.AddScoped<PhraseService>();
         services.AddScoped<ReviewService>();
+        services.AddScoped<PracticeService>();
 
         // Stateless apart from the shared Random used for fuzzing
         services.AddSingleton(new FsrsScheduler());

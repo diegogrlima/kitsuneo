@@ -58,7 +58,20 @@ public sealed class FsrsScheduler
     }
 
     /// <summary>Returns the card's state after being rated <paramref name="rating"/> at <paramref name="reviewedAt"/>.</summary>
-    public FsrsCard Review(FsrsCard card, ReviewRating rating, DateTime reviewedAt)
+    public FsrsCard Review(FsrsCard card, ReviewRating rating, DateTime reviewedAt) =>
+        Review(card, rating, reviewedAt, _options.EnableFuzzing);
+
+    /// <summary>
+    /// The due date each rating would give the card at <paramref name="reviewedAt"/>, without fuzz,
+    /// so the actual review may land a few days off.
+    /// </summary>
+    public ReviewPreview Preview(FsrsCard card, DateTime reviewedAt) => new(
+        Review(card, ReviewRating.Again, reviewedAt, fuzz: false).DueAt,
+        Review(card, ReviewRating.Hard, reviewedAt, fuzz: false).DueAt,
+        Review(card, ReviewRating.Good, reviewedAt, fuzz: false).DueAt,
+        Review(card, ReviewRating.Easy, reviewedAt, fuzz: false).DueAt);
+
+    private FsrsCard Review(FsrsCard card, ReviewRating rating, DateTime reviewedAt, bool fuzz)
     {
         if (reviewedAt.Kind != DateTimeKind.Utc)
             throw new ArgumentException("Review time must be UTC.", nameof(reviewedAt));
@@ -75,7 +88,7 @@ public sealed class FsrsScheduler
             _ => throw new ArgumentOutOfRangeException(nameof(card), card.State, "Invalid review state.")
         };
 
-        if (_options.EnableFuzzing && state == ReviewState.Review)
+        if (fuzz && state == ReviewState.Review)
             interval = Fuzz(interval);
 
         return new FsrsCard(state, step, stability, difficulty, reviewedAt + interval, reviewedAt);
