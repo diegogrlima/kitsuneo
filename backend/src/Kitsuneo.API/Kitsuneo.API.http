@@ -72,3 +72,9 @@ Accept: application/json
 {
   "rating": "Good"
 }
+
+### Listen to a phrase read by the AI voice (MP3; 503 if ElevenLabs:ApiKey is not set)
+GET {{Kitsuneo.API_HostAddress}}/api/v1/phrases/{{today.response.body.$.items[0].phraseId}}/audio
+
+### Same phrase, slower
+GET {{Kitsuneo.API_HostAddress}}/api/v1/phrases/{{today.response.body.$.items[0].phraseId}}/audio?slow=true

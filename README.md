@@ -71,7 +71,28 @@ Nenhum dado sensível fica versionado:
 - **Senha do banco na API:** fica no [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) do .NET (`UserSecretsId: kitsuneo-api`), na chave `Database:Password`. O `appsettings.json` guarda apenas a connection string sem senha.
 - **Senha do contêiner PostgreSQL:** fica no arquivo `.env` da raiz (ignorado pelo git), na variável `POSTGRES_PASSWORD`. Os dois valores devem ser iguais.
 
+- **Chave do ElevenLabs (voz):** fica no user-secrets da API, na chave `ElevenLabs:ApiKey`. É opcional: sem ela, o resto da API funciona e só o endpoint de áudio responde `503`.
+
 No Docker, o diretório do user-secrets do host é montado como somente leitura no contêiner do backend, que roda em `Development` para carregá-lo.
+
+### Voz com IA (ElevenLabs)
+
+`GET /api/v1/phrases/{id}/audio?slow=false` devolve a frase (o `SpokenForm`) lida em voz alta, em MP3. Assim a prática toca o ditado sem revelar o texto. Para a demonstração, usa o [plano gratuito do ElevenLabs](https://elevenlabs.io/pricing):
+
+1. Crie uma conta em https://elevenlabs.io e gere uma chave em **Developers → API Keys** (basta a permissão *Text to Speech*).
+2. Guarde a chave no user-secrets da API:
+
+   ```bash
+   dotnet user-secrets set "ElevenLabs:ApiKey" "<sua chave>" --project backend/src/Kitsuneo.API
+   ```
+
+O plano gratuito tem uma cota mensal pequena de créditos e só usa as vozes padrão pela API. Para economizar:
+
+- O modelo padrão é o `eleven_flash_v2_5`, que fala inglês e japonês e custa metade dos créditos por caractere.
+- Cada áudio gerado fica em cache no disco (`ElevenLabs:CacheDirectory`, por padrão `kitsuneo-audio` na pasta temporária), então tocar a mesma frase de novo não gasta créditos.
+- `slow=true` gera uma versão mais lenta (velocidade 0,7), que é um áudio separado no cache.
+
+Voz, modelo e demais opções podem ser trocados na seção `ElevenLabs` da configuração (por exemplo, `ElevenLabs:Voices:Japanese` para uma voz só para o japonês). O plano gratuito exige dar crédito ao ElevenLabs onde o áudio for usado, então a tela de prática deve exibir algo como "Voz gerada por ElevenLabs".
 
 ### Primeira execução
 
