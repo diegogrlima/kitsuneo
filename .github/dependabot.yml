@@ -35,6 +35,10 @@ updates:
     directory: /backend
     schedule:
       interval: weekly
+    ignore:
+      # FluentAssertions 8+ moved to a commercial license; stay on 7.x
+      - dependency-name: FluentAssertions
+        update-types: [version-update:semver-major]
     commit-message:
       prefix: chore
       include: scope
