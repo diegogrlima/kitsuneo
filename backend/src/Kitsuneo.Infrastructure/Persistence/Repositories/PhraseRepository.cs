@@ -14,7 +14,7 @@ public sealed class PhraseRepository(AppDbContext context) : IPhraseRepository
     public Task<Phrase?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         context.Phrases
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(p => p.Id == id && !p.IsArchived, cancellationToken);
 
     public async Task<IReadOnlyList<Phrase>> ListAsync(
         Guid userId,
@@ -50,6 +50,36 @@ public sealed class PhraseRepository(AppDbContext context) : IPhraseRepository
             .ThenByDescending(p => p.Id)
             .Take(limit)
             .ToListAsync(cancellationToken);
+    }
+
+    // ExecuteUpdate runs a single UPDATE with no prior SELECT; the UserId filter enforces ownership
+    public async Task<bool> UpdateAsync(
+        Guid id,
+        Guid userId,
+        PhraseContent content,
+        CancellationToken cancellationToken = default)
+    {
+        var affected = await context.Phrases
+            .Where(p => p.Id == id && p.UserId == userId && !p.IsArchived)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.Language, content.Language)
+                .SetProperty(p => p.Text, content.Text)
+                .SetProperty(p => p.SpokenForm, content.SpokenForm)
+                .SetProperty(p => p.Reading, content.Reading)
+                .SetProperty(p => p.Translation, content.Translation),
+                cancellationToken);
+
+        return affected > 0;
+    }
+
+    // Soft delete: the row stays, archived phrases are hidden from every query
+    public async Task<bool> DeleteAsync(Guid id, Guid userId, CancellationToken cancellationToken = default)
+    {
+        var affected = await context.Phrases
+            .Where(p => p.Id == id && p.UserId == userId && !p.IsArchived)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.IsArchived, true), cancellationToken);
+
+        return affected > 0;
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>

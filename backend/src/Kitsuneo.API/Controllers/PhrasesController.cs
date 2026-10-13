@@ -55,4 +55,28 @@ public sealed class PhrasesController(PhraseService phraseService) : ControllerB
 
         return Ok(phrases);
     }
+
+    [HttpPut("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> Update(
+        Guid id,
+        UpdatePhraseRequest request,
+        CancellationToken cancellationToken)
+    {
+        var updated = await phraseService.UpdateAsync(id, request, cancellationToken);
+
+        return updated ? NoContent() : NotFound();
+    }
+
+    [HttpDelete("{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var deleted = await phraseService.DeleteAsync(id, cancellationToken);
+
+        return deleted ? NoContent() : NotFound();
+    }
 }

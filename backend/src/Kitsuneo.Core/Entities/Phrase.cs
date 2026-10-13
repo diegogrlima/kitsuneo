@@ -30,38 +30,19 @@ public sealed class Phrase
         if (userId == Guid.Empty)
             throw new DomainException("UserId is required.");
 
-        if (!Enum.IsDefined(language))
-            throw new DomainException("Invalid language.");
-
-        var normalizedText = EnsureMaxLength(Normalize(text), nameof(Text))
-            ?? throw new DomainException("Text is required.");
-
-        var normalizedReading = EnsureMaxLength(Normalize(reading), nameof(Reading));
-        if (normalizedReading is not null && language != Language.Japanese)
-            throw new DomainException("Reading is only supported for Japanese phrases.");
+        var content = PhraseContent.Create(language, text, spokenForm, reading, translation);
 
         return new Phrase
         {
             Id = Guid.CreateVersion7(),
             UserId = userId,
-            Language = language,
-            Text = normalizedText,
-            SpokenForm = EnsureMaxLength(Normalize(spokenForm), nameof(SpokenForm)) ?? normalizedText,
-            Reading = normalizedReading,
-            Translation = EnsureMaxLength(Normalize(translation), nameof(Translation)),
+            Language = content.Language,
+            Text = content.Text,
+            SpokenForm = content.SpokenForm,
+            Reading = content.Reading,
+            Translation = content.Translation,
             IsArchived = false,
             CreatedAt = DateTime.UtcNow
         };
-    }
-
-    private static string? Normalize(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private static string? EnsureMaxLength(string? value, string field)
-    {
-        if (value is not null && value.Length > MaxLength)
-            throw new DomainException($"{field} must have at most {MaxLength} characters.");
-
-        return value;
     }
 }

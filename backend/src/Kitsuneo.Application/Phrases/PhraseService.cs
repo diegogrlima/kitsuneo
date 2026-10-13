@@ -27,7 +27,7 @@ public sealed class PhraseService(IPhraseRepository repository)
         return PhraseResponse.FromEntity(phrase);
     }
 
-    /// <summary>Returns null when the phrase does not exist or belongs to another user.</summary>
+    /// <summary>Returns null when the phrase does not exist, is archived or belongs to another user.</summary>
     public async Task<PhraseResponse?> GetAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var phrase = await repository.GetByIdAsync(id, cancellationToken);
@@ -36,6 +36,23 @@ public sealed class PhraseService(IPhraseRepository repository)
             ? null
             : PhraseResponse.FromEntity(phrase);
     }
+
+    /// <summary>Returns false when the phrase does not exist, is archived or belongs to another user.</summary>
+    public async Task<bool> UpdateAsync(Guid id, UpdatePhraseRequest request, CancellationToken cancellationToken = default)
+    {
+        var content = PhraseContent.Create(
+            request.Language,
+            request.Text,
+            request.SpokenForm,
+            request.Reading,
+            request.Translation);
+
+        return await repository.UpdateAsync(id, DefaultUser.Id, content, cancellationToken);
+    }
+
+    /// <summary>Returns false when the phrase does not exist, is archived or belongs to another user.</summary>
+    public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
+        repository.DeleteAsync(id, DefaultUser.Id, cancellationToken);
 
     public async Task<CursorPage<PhraseResponse>> ListAsync(
         Language? language = null,
