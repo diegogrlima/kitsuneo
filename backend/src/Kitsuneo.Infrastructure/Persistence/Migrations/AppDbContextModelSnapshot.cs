@@ -97,6 +97,8 @@ namespace Kitsuneo.Infrastructure.Persistence.Migrations
 
                     b.HasKey("PhraseId");
 
+                    b.HasIndex("DueAt");
+
                     b.ToTable("review_schedules", (string)null);
                 });
 

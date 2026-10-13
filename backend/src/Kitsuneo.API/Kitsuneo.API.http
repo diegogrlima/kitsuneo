@@ -32,3 +32,16 @@ Accept: application/json
 ### List phrases, optionally filtered by language and search term
 GET {{Kitsuneo.API_HostAddress}}/api/v1/phrases?language=Japanese&search=猫
 Accept: application/json
+
+### List phrases due for review
+GET {{Kitsuneo.API_HostAddress}}/api/v1/reviews/due?limit=20
+Accept: application/json
+
+### Review a phrase: Again, Hard, Good or Easy (uses the id returned by the first request)
+POST {{Kitsuneo.API_HostAddress}}/api/v1/phrases/{{createEnglish.response.body.$.id}}/reviews
+Content-Type: application/json
+Accept: application/json
+
+{
+  "rating": "Good"
+}
