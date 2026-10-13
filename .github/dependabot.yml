@@ -1,6 +1,6 @@
 version: 2
 
-# Mensagens no formato "chore(deps): ..." para passar no commitlint
+# Mensagens no formato "chore(deps): ..." ou "chore(deps-dev): ..." para passar no commitlint
 updates:
   - package-ecosystem: npm
     directory: /
@@ -17,6 +17,13 @@ updates:
     directory: /frontend
     schedule:
       interval: weekly
+    ignore:
+      # Majors that need the toolchain to catch up: typescript-eslint doesn't support TS 7 yet,
+      # and @types/node must follow the Node version the app runs on, not the latest
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
     commit-message:
       prefix: chore
       include: scope
@@ -28,6 +35,10 @@ updates:
     directory: /backend
     schedule:
       interval: weekly
+    ignore:
+      # FluentAssertions 8+ moved to a commercial license; stay on 7.x
+      - dependency-name: FluentAssertions
+        update-types: [version-update:semver-major]
     commit-message:
       prefix: chore
       include: scope
