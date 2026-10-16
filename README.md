@@ -9,7 +9,10 @@ Monorepo do projeto, contendo o frontend em Next.js e o backend em ASP.NET Core.
 ```
 Kitsuneo/
 ├── frontend/                       # Aplicação web (Next.js)
-│   └── src/app/                    # App Router
+│   └── src/
+│       ├── app/                    # App Router: (auth)/login, (auth)/register, (app)/, (app)/phrases, (app)/practice
+│       ├── components/             # Shell autenticado, formulários e componentes de UI
+│       └── lib/                    # Cliente da API, sessão, tipos e áudio
 └── backend/                        # API (ASP.NET Core)
     ├── Kitsuneo.slnx               # Solution
     ├── src/
@@ -155,7 +158,20 @@ npm install
 npm run dev
 ```
 
-Disponível em http://localhost:3000.
+Disponível em http://localhost:3000. Requer o backend rodando.
+
+O servidor do Next.js faz proxy de `/api/v1/*` para o backend (`rewrites` em `next.config.ts`), então o navegador fala só com a origem do frontend e o cookie do refresh token funciona sem CORS. O destino vem da variável `API_URL` (padrão `http://localhost:5243`), lida **no build**: no Docker ela é passada como build arg (`http://backend:8080`).
+
+Telas:
+
+| Rota | O que faz |
+| ---- | --------- |
+| `/login`, `/register` | Entrar ou criar conta |
+| `/` | Resumo do dia: revisões pendentes, frases novas e total salvo |
+| `/practice` | Ditado: ouve a frase (normal ou devagar), escreve, vê a correção palavra a palavra (ou kana a kana) e avalia de 1 a 4 |
+| `/phrases` | Lista com busca, filtro por idioma e paginação; criar, editar, excluir e ouvir frases |
+
+Sessão no navegador: o access token fica só em memória. Ao abrir o app, ele chama `POST /auth/refresh` para recuperar a sessão pelo cookie, e qualquer `401` dispara um refresh e repete a requisição uma vez. Refreshes simultâneos compartilham uma única requisição, porque reusar um refresh token já trocado revoga a sessão inteira. O áudio é baixado com o token (não dá para usar `<audio src>`) e guardado como object URL enquanto a tela está aberta.
 
 ### Backend
 

@@ -8,6 +8,9 @@ RUN npm ci --no-audit --no-fund
 FROM node:${NODE_VERSION} AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+# Where /api/v1/* is proxied to; rewrites are fixed at build time
+ARG API_URL=http://backend:8080
+ENV API_URL=${API_URL}
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 # public/ may be empty and therefore absent from git
