@@ -41,6 +41,9 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        # The Next.js server proxies /api/v1/* to the backend over the compose network
+        API_URL: http://backend:8080
     restart: unless-stopped
     depends_on:
       - backend

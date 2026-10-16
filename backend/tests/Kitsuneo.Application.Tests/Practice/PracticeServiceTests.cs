@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Kitsuneo.Application.Abstractions;
 using Kitsuneo.Application.Practice;
-using Kitsuneo.Application.Users;
 using Kitsuneo.Core.Dictation;
 using Kitsuneo.Core.Entities;
 using Kitsuneo.Core.Enums;
@@ -13,6 +12,8 @@ namespace Kitsuneo.Application.Tests.Practice;
 
 public class PracticeServiceTests
 {
+    private static readonly Guid UserId = Guid.NewGuid();
+
     private static readonly DateTime Now = new(2026, 3, 10, 15, 30, 0, DateTimeKind.Utc);
 
     private readonly IPhraseRepository _phrases = Substitute.For<IPhraseRepository>();
@@ -23,7 +24,8 @@ public class PracticeServiceTests
 
     public PracticeServiceTests()
     {
-        _service = new PracticeService(_phrases, _reviews, _attempts, _scheduler, new FixedTimeProvider(Now));
+        _service = new PracticeService(
+            _phrases, _reviews, _attempts, _scheduler, new FixedTimeProvider(Now), new FakeCurrentUser(UserId));
     }
 
     // GetTodayAsync
@@ -31,10 +33,10 @@ public class PracticeServiceTests
     [Fact]
     public async Task GetTodayAsync_ListsReviewsThenNewPhrasesWithoutText()
     {
-        var review = Phrase.Create(DefaultUser.Id, Language.English, "Reviewed");
-        var fresh = Phrase.Create(DefaultUser.Id, Language.Japanese, "猫", reading: "ねこ");
-        _reviews.ListDueReviewsAsync(DefaultUser.Id, Now, null, Arg.Any<CancellationToken>()).Returns([review]);
-        _reviews.ListNewAsync(DefaultUser.Id, DefaultUser.NewPhrasesPerDay, null, Arg.Any<CancellationToken>()).Returns([fresh]);
+        var review = Phrase.Create(UserId, Language.English, "Reviewed");
+        var fresh = Phrase.Create(UserId, Language.Japanese, "猫", reading: "ねこ");
+        _reviews.ListDueReviewsAsync(UserId, Now, null, Arg.Any<CancellationToken>()).Returns([review]);
+        _reviews.ListNewAsync(UserId, PracticeService.NewPhrasesPerDay, null, Arg.Any<CancellationToken>()).Returns([fresh]);
 
         var today = await _service.GetTodayAsync();
 
@@ -48,12 +50,12 @@ public class PracticeServiceTests
     [Fact]
     public async Task GetTodayAsync_SubtractsPhrasesStartedTodayFromNewLimit()
     {
-        _attempts.CountPhrasesFirstAttemptedSinceAsync(DefaultUser.Id, Now.Date, Arg.Any<CancellationToken>()).Returns(7);
+        _attempts.CountPhrasesFirstAttemptedSinceAsync(UserId, Now.Date, Arg.Any<CancellationToken>()).Returns(7);
 
         await _service.GetTodayAsync(Language.Japanese);
 
-        await _reviews.Received(1).ListNewAsync(DefaultUser.Id, 3, Language.Japanese, Arg.Any<CancellationToken>());
-        await _reviews.Received(1).ListDueReviewsAsync(DefaultUser.Id, Now, Language.Japanese, Arg.Any<CancellationToken>());
+        await _reviews.Received(1).ListNewAsync(UserId, 3, Language.Japanese, Arg.Any<CancellationToken>());
+        await _reviews.Received(1).ListDueReviewsAsync(UserId, Now, Language.Japanese, Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -61,7 +63,7 @@ public class PracticeServiceTests
     [InlineData(12)]
     public async Task GetTodayAsync_WhenDailyNewLimitReached_ReturnsNoNewPhrases(int startedToday)
     {
-        _attempts.CountPhrasesFirstAttemptedSinceAsync(DefaultUser.Id, Now.Date, Arg.Any<CancellationToken>()).Returns(startedToday);
+        _attempts.CountPhrasesFirstAttemptedSinceAsync(UserId, Now.Date, Arg.Any<CancellationToken>()).Returns(startedToday);
 
         var today = await _service.GetTodayAsync();
 
@@ -74,7 +76,7 @@ public class PracticeServiceTests
     [Fact]
     public async Task SubmitAttemptAsync_JapaneseWithReading_ComparesAgainstReading()
     {
-        var phrase = Phrase.Create(DefaultUser.Id, Language.Japanese, "猫が好きです", reading: "ねこがすきです", translation: "I like cats");
+        var phrase = Phrase.Create(UserId, Language.Japanese, "猫が好きです", reading: "ねこがすきです", translation: "I like cats");
         _phrases.GetByIdAsync(phrase.Id, Arg.Any<CancellationToken>()).Returns(phrase);
 
         var result = await _service.SubmitAttemptAsync(phrase.Id, "ネコがすきです", playCount: 2, usedSlowSpeed: true, durationMs: 5000);
@@ -90,7 +92,7 @@ public class PracticeServiceTests
     [Fact]
     public async Task SubmitAttemptAsync_JapaneseWithoutReading_ComparesAgainstText()
     {
-        var phrase = Phrase.Create(DefaultUser.Id, Language.Japanese, "ねこ");
+        var phrase = Phrase.Create(UserId, Language.Japanese, "ねこ");
         _phrases.GetByIdAsync(phrase.Id, Arg.Any<CancellationToken>()).Returns(phrase);
 
         var result = await _service.SubmitAttemptAsync(phrase.Id, "ねこ", 1, false, 1000);
@@ -101,7 +103,7 @@ public class PracticeServiceTests
     [Fact]
     public async Task SubmitAttemptAsync_SavesAttemptAndReturnsPreview()
     {
-        var phrase = Phrase.Create(DefaultUser.Id, Language.English, "I like cats");
+        var phrase = Phrase.Create(UserId, Language.English, "I like cats");
         _phrases.GetByIdAsync(phrase.Id, Arg.Any<CancellationToken>()).Returns(phrase);
         PracticeAttempt? saved = null;
         await _attempts.AddAsync(Arg.Do<PracticeAttempt>(a => saved = a), Arg.Any<CancellationToken>());
@@ -121,7 +123,7 @@ public class PracticeServiceTests
         saved.Should().BeEquivalentTo(new
         {
             PhraseId = phrase.Id,
-            UserId = DefaultUser.Id,
+            UserId = UserId,
             Answer = "I like cat",
             Accuracy = 66.67,
             PlayCount = 3,
@@ -160,7 +162,7 @@ public class PracticeServiceTests
     [Fact]
     public async Task SubmitAttemptAsync_WithNegativePlayCount_ThrowsDomainException()
     {
-        var phrase = Phrase.Create(DefaultUser.Id, Language.English, "Hello");
+        var phrase = Phrase.Create(UserId, Language.English, "Hello");
         _phrases.GetByIdAsync(phrase.Id, Arg.Any<CancellationToken>()).Returns(phrase);
 
         var act = () => _service.SubmitAttemptAsync(phrase.Id, "Hello", -1, false, 1000);
@@ -214,8 +216,8 @@ public class PracticeServiceTests
     [Fact]
     public async Task RateAttemptAsync_WhenPhraseWasArchived_ReturnsNull()
     {
-        var attempt = PracticeAttempt.Create(Guid.NewGuid(), DefaultUser.Id, "a", 0, 1, false, 1);
-        _attempts.GetByIdAsync(attempt.Id, DefaultUser.Id, Arg.Any<CancellationToken>()).Returns(attempt);
+        var attempt = PracticeAttempt.Create(Guid.NewGuid(), UserId, "a", 0, 1, false, 1);
+        _attempts.GetByIdAsync(attempt.Id, UserId, Arg.Any<CancellationToken>()).Returns(attempt);
 
         var result = await _service.RateAttemptAsync(attempt.Id, ReviewRating.Good);
 
@@ -235,10 +237,10 @@ public class PracticeServiceTests
 
     private (Phrase Phrase, PracticeAttempt Attempt) ArrangeAttempt()
     {
-        var phrase = Phrase.Create(DefaultUser.Id, Language.English, "I like cats");
-        var attempt = PracticeAttempt.Create(phrase.Id, DefaultUser.Id, "I like cats", 100, 1, false, 3000);
-        _attempts.GetByIdAsync(attempt.Id, DefaultUser.Id, Arg.Any<CancellationToken>()).Returns(attempt);
-        _reviews.GetForReviewAsync(phrase.Id, DefaultUser.Id, Arg.Any<CancellationToken>()).Returns(phrase);
+        var phrase = Phrase.Create(UserId, Language.English, "I like cats");
+        var attempt = PracticeAttempt.Create(phrase.Id, UserId, "I like cats", 100, 1, false, 3000);
+        _attempts.GetByIdAsync(attempt.Id, UserId, Arg.Any<CancellationToken>()).Returns(attempt);
+        _reviews.GetForReviewAsync(phrase.Id, UserId, Arg.Any<CancellationToken>()).Returns(phrase);
         return (phrase, attempt);
     }
 

@@ -1,12 +1,15 @@
 using Kitsuneo.Application.Abstractions;
-using Kitsuneo.Application.Users;
 using Kitsuneo.Core.Enums;
 using Kitsuneo.Core.Exceptions;
 using Kitsuneo.Core.Scheduling;
 
 namespace Kitsuneo.Application.Reviews;
 
-public sealed class ReviewService(IReviewRepository repository, FsrsScheduler scheduler, TimeProvider timeProvider)
+public sealed class ReviewService(
+    IReviewRepository repository,
+    FsrsScheduler scheduler,
+    TimeProvider timeProvider,
+    ICurrentUser currentUser)
 {
     public const int DefaultLimit = 20;
     public const int MaxLimit = 100;
@@ -18,7 +21,7 @@ public sealed class ReviewService(IReviewRepository repository, FsrsScheduler sc
         limit = Math.Clamp(limit, 1, MaxLimit);
 
         var phrases = await repository.ListDueAsync(
-            DefaultUser.Id, timeProvider.GetUtcNow().UtcDateTime, limit, cancellationToken);
+            currentUser.Id, timeProvider.GetUtcNow().UtcDateTime, limit, cancellationToken);
 
         return phrases.Select(DueReviewResponse.FromEntity).ToList();
     }
@@ -33,7 +36,7 @@ public sealed class ReviewService(IReviewRepository repository, FsrsScheduler sc
         if (!Enum.IsDefined(request.Rating))
             throw new DomainException("Invalid rating.");
 
-        var phrase = await repository.GetForReviewAsync(phraseId, DefaultUser.Id, cancellationToken);
+        var phrase = await repository.GetForReviewAsync(phraseId, currentUser.Id, cancellationToken);
         if (phrase is null)
             return null;
 

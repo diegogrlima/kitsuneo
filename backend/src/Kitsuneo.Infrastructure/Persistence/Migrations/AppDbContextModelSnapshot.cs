@@ -123,6 +123,46 @@ namespace Kitsuneo.Infrastructure.Persistence.Migrations
                     b.ToTable("practice_attempts", (string)null);
                 });
 
+            modelBuilder.Entity("Kitsuneo.Core.Entities.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ReplacedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FamilyId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("refresh_tokens", (string)null);
+                });
+
             modelBuilder.Entity("Kitsuneo.Core.Entities.ReviewSchedule", b =>
                 {
                     b.Property<Guid>("PhraseId")
@@ -155,6 +195,65 @@ namespace Kitsuneo.Infrastructure.Persistence.Migrations
                     b.ToTable("review_schedules", (string)null);
                 });
 
+            modelBuilder.Entity("Kitsuneo.Core.Entities.RevokedAccessToken", b =>
+                {
+                    b.Property<string>("Jti")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Jti");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("revoked_access_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("Kitsuneo.Core.Entities.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("Kitsuneo.Core.Entities.Phrase", b =>
+                {
+                    b.HasOne("Kitsuneo.Core.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Kitsuneo.Core.Entities.PracticeAttempt", b =>
                 {
                     b.HasOne("Kitsuneo.Core.Entities.Phrase", null)
@@ -164,11 +263,29 @@ namespace Kitsuneo.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Kitsuneo.Core.Entities.RefreshToken", b =>
+                {
+                    b.HasOne("Kitsuneo.Core.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Kitsuneo.Core.Entities.ReviewSchedule", b =>
                 {
                     b.HasOne("Kitsuneo.Core.Entities.Phrase", null)
                         .WithOne("ReviewSchedule")
                         .HasForeignKey("Kitsuneo.Core.Entities.ReviewSchedule", "PhraseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Kitsuneo.Core.Entities.RevokedAccessToken", b =>
+                {
+                    b.HasOne("Kitsuneo.Core.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

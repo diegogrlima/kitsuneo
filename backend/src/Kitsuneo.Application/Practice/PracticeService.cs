@@ -1,5 +1,4 @@
 using Kitsuneo.Application.Abstractions;
-using Kitsuneo.Application.Users;
 using Kitsuneo.Core.Dictation;
 using Kitsuneo.Core.Entities;
 using Kitsuneo.Core.Enums;
@@ -13,11 +12,15 @@ public sealed class PracticeService(
     IReviewRepository reviewRepository,
     IPracticeAttemptRepository attemptRepository,
     FsrsScheduler scheduler,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ICurrentUser currentUser)
 {
+    /// <summary>How many never-practiced phrases are introduced per UTC day.</summary>
+    public const int NewPhrasesPerDay = 10;
+
     /// <summary>
     /// Due reviews, then new phrases. New phrases are those never reviewed, capped at
-    /// <see cref="DefaultUser.NewPhrasesPerDay"/> minus the phrases first attempted today (UTC).
+    /// <see cref="NewPhrasesPerDay"/> minus the phrases first attempted today (UTC).
     /// </summary>
     public async Task<TodayPracticeResponse> GetTodayAsync(
         Language? language = null,
@@ -25,14 +28,14 @@ public sealed class PracticeService(
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        var reviews = await reviewRepository.ListDueReviewsAsync(DefaultUser.Id, now, language, cancellationToken);
+        var reviews = await reviewRepository.ListDueReviewsAsync(currentUser.Id, now, language, cancellationToken);
 
         var startedToday = await attemptRepository.CountPhrasesFirstAttemptedSinceAsync(
-            DefaultUser.Id, now.Date, cancellationToken);
-        var newLimit = Math.Max(DefaultUser.NewPhrasesPerDay - startedToday, 0);
+            currentUser.Id, now.Date, cancellationToken);
+        var newLimit = Math.Max(NewPhrasesPerDay - startedToday, 0);
 
         var newPhrases = newLimit > 0
-            ? await reviewRepository.ListNewAsync(DefaultUser.Id, newLimit, language, cancellationToken)
+            ? await reviewRepository.ListNewAsync(currentUser.Id, newLimit, language, cancellationToken)
             : [];
 
         var items = reviews.Select(p => new PracticeItemResponse(p.Id, p.Language, IsNew: false))
@@ -52,7 +55,7 @@ public sealed class PracticeService(
         CancellationToken cancellationToken = default)
     {
         var phrase = await phraseRepository.GetByIdAsync(phraseId, cancellationToken);
-        if (phrase is null || phrase.UserId != DefaultUser.Id)
+        if (phrase is null || phrase.UserId != currentUser.Id)
             return null;
 
         // Japanese is dictated in kana, so it is checked against the reading when there is one
@@ -62,7 +65,7 @@ public sealed class PracticeService(
         var result = DictationComparer.Compare(phrase.Language, expected, answer ?? string.Empty);
 
         var attempt = PracticeAttempt.Create(
-            phrase.Id, DefaultUser.Id, answer, result.Accuracy, playCount, usedSlowSpeed, durationMs);
+            phrase.Id, currentUser.Id, answer, result.Accuracy, playCount, usedSlowSpeed, durationMs);
 
         await attemptRepository.AddAsync(attempt, cancellationToken);
         await attemptRepository.SaveChangesAsync(cancellationToken);
@@ -93,11 +96,11 @@ public sealed class PracticeService(
         if (!Enum.IsDefined(rating))
             throw new DomainException("Invalid rating.");
 
-        var attempt = await attemptRepository.GetByIdAsync(attemptId, DefaultUser.Id, cancellationToken);
+        var attempt = await attemptRepository.GetByIdAsync(attemptId, currentUser.Id, cancellationToken);
         if (attempt is null)
             return null;
 
-        var phrase = await reviewRepository.GetForReviewAsync(attempt.PhraseId, DefaultUser.Id, cancellationToken);
+        var phrase = await reviewRepository.GetForReviewAsync(attempt.PhraseId, currentUser.Id, cancellationToken);
         if (phrase is null)
             return null;
 

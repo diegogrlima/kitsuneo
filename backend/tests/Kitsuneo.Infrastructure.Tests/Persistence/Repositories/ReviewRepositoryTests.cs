@@ -7,13 +7,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Kitsuneo.Infrastructure.Tests.Persistence.Repositories;
 
-// Each test owns a fresh UserId, so tests never see each other's rows and need no cleanup
+// Each test owns a fresh user, so tests never see each other's rows and need no cleanup
 [Collection(PostgresCollection.Name)]
-public class ReviewRepositoryTests(PostgresFixture fixture)
+public class ReviewRepositoryTests(PostgresFixture fixture) : IAsyncLifetime
 {
     private static readonly DateTime Now = new(2026, 6, 1, 12, 0, 0, DateTimeKind.Utc);
 
-    private readonly Guid _userId = Guid.NewGuid();
+    private Guid _userId;
+
+    public async Task InitializeAsync() => _userId = await fixture.CreateUserAsync();
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task ListDueAsync_ReturnsOnlyDuePhrasesMostOverdueFirst()
@@ -35,7 +39,7 @@ public class ReviewRepositoryTests(PostgresFixture fixture)
         var own = await SeedAsync("Mine", Now.AddDays(-1));
         var archived = await SeedAsync("Archived", Now.AddDays(-1));
         await ArchiveAsync(archived.Id);
-        await SeedAsync("Someone else's", Now.AddDays(-1), Guid.NewGuid());
+        await SeedAsync("Someone else's", Now.AddDays(-1), await fixture.CreateUserAsync());
 
         var due = await ListDueAsync();
 
@@ -73,7 +77,7 @@ public class ReviewRepositoryTests(PostgresFixture fixture)
         await SeedAsync("English", Now.AddDays(-1), lastReviewedAt: Now.AddDays(-2));
         var archived = await SeedAsync("アーカイブ", Now.AddDays(-1), lastReviewedAt: Now.AddDays(-2), language: Language.Japanese);
         await ArchiveAsync(archived.Id);
-        await SeedAsync("他人", Now.AddDays(-1), Guid.NewGuid(), Now.AddDays(-2), Language.Japanese);
+        await SeedAsync("他人", Now.AddDays(-1), await fixture.CreateUserAsync(), Now.AddDays(-2), Language.Japanese);
 
         var due = await ListDueReviewsAsync(Language.Japanese);
 
@@ -130,7 +134,7 @@ public class ReviewRepositoryTests(PostgresFixture fixture)
     [Fact]
     public async Task GetForReviewAsync_WithOtherUsersPhrase_ReturnsNull()
     {
-        var phrase = await SeedAsync("Someone else's", Now, Guid.NewGuid());
+        var phrase = await SeedAsync("Someone else's", Now, await fixture.CreateUserAsync());
         await using var context = fixture.CreateContext();
 
         var result = await new ReviewRepository(context).GetForReviewAsync(phrase.Id, _userId);

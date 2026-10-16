@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Kitsuneo.Application.Abstractions;
 using Kitsuneo.Application.Speech;
-using Kitsuneo.Application.Users;
 using Kitsuneo.Core.Entities;
 using Kitsuneo.Core.Enums;
 using NSubstitute;
@@ -10,6 +9,8 @@ namespace Kitsuneo.Application.Tests.Speech;
 
 public class PhraseAudioServiceTests
 {
+    private static readonly Guid UserId = Guid.NewGuid();
+
     private static readonly SpeechAudio Audio = new([1, 2, 3], "audio/mpeg");
 
     private readonly IPhraseRepository _phrases = Substitute.For<IPhraseRepository>();
@@ -18,7 +19,7 @@ public class PhraseAudioServiceTests
 
     public PhraseAudioServiceTests()
     {
-        _service = new PhraseAudioService(_phrases, _textToSpeech);
+        _service = new PhraseAudioService(_phrases, _textToSpeech, new FakeCurrentUser(UserId));
         _textToSpeech.SynthesizeAsync(default!, default, default, default).ReturnsForAnyArgs(Audio);
     }
 
@@ -27,7 +28,7 @@ public class PhraseAudioServiceTests
     [InlineData(true)]
     public async Task GetAsync_ReadsSpokenFormInPhraseLanguage(bool slow)
     {
-        var phrase = Phrase.Create(DefaultUser.Id, Language.Japanese, "猫が好きです", spokenForm: "ねこがすきです");
+        var phrase = Phrase.Create(UserId, Language.Japanese, "猫が好きです", spokenForm: "ねこがすきです");
         _phrases.GetByIdAsync(phrase.Id, Arg.Any<CancellationToken>()).Returns(phrase);
 
         var audio = await _service.GetAsync(phrase.Id, slow);

@@ -6,13 +6,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Kitsuneo.Infrastructure.Tests.Persistence.Repositories;
 
-// Each test owns a fresh UserId, so tests never see each other's rows and need no cleanup
+// Each test owns a fresh user, so tests never see each other's rows and need no cleanup
 [Collection(PostgresCollection.Name)]
-public class PracticeAttemptRepositoryTests(PostgresFixture fixture)
+public class PracticeAttemptRepositoryTests(PostgresFixture fixture) : IAsyncLifetime
 {
     private static readonly DateTime Today = new(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
 
-    private readonly Guid _userId = Guid.NewGuid();
+    private Guid _userId;
+
+    public async Task InitializeAsync() => _userId = await fixture.CreateUserAsync();
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task AddAsync_ThenGetByIdAsync_ReturnsSavedAttempt()

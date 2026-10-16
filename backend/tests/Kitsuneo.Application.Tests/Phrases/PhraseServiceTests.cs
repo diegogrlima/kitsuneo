@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Kitsuneo.Application.Abstractions;
 using Kitsuneo.Application.Phrases;
-using Kitsuneo.Application.Users;
 using Kitsuneo.Core.Entities;
 using Kitsuneo.Core.Enums;
 using Kitsuneo.Core.Exceptions;
@@ -11,16 +10,18 @@ namespace Kitsuneo.Application.Tests.Phrases;
 
 public class PhraseServiceTests
 {
+    private static readonly Guid UserId = Guid.NewGuid();
+
     private readonly IPhraseRepository _repository = Substitute.For<IPhraseRepository>();
     private readonly PhraseService _service;
 
     public PhraseServiceTests()
     {
-        _service = new PhraseService(_repository);
+        _service = new PhraseService(_repository, new FakeCurrentUser(UserId));
     }
 
     [Fact]
-    public async Task CreateAsync_WithValidRequest_ReturnsPhraseOwnedByDefaultUser()
+    public async Task CreateAsync_WithValidRequest_ReturnsPhraseOwnedByCurrentUser()
     {
         var request = new CreatePhraseRequest(Language.Japanese, " 猫が好きです ", "ねこがすきです", "ねこがすきです", "I like cats");
 
@@ -35,7 +36,7 @@ public class PhraseServiceTests
         response.IsArchived.Should().BeFalse();
 
         await _repository.Received(1).AddAsync(
-            Arg.Is<Phrase>(p => p.Id == response.Id && p.UserId == DefaultUser.Id && p.Text == "猫が好きです"),
+            Arg.Is<Phrase>(p => p.Id == response.Id && p.UserId == UserId && p.Text == "猫が好きです"),
             Arg.Any<CancellationToken>());
     }
 
@@ -79,9 +80,9 @@ public class PhraseServiceTests
     }
 
     [Fact]
-    public async Task GetAsync_WithPhraseOfDefaultUser_ReturnsPhrase()
+    public async Task GetAsync_WithPhraseOfCurrentUser_ReturnsPhrase()
     {
-        var phrase = Phrase.Create(DefaultUser.Id, Language.English, "Hello", translation: "Olá");
+        var phrase = Phrase.Create(UserId, Language.English, "Hello", translation: "Olá");
         using var cts = new CancellationTokenSource();
         _repository.GetByIdAsync(phrase.Id, cts.Token).Returns(phrase);
 
@@ -112,7 +113,7 @@ public class PhraseServiceTests
     }
 
     [Fact]
-    public async Task ListAsync_WithFilters_QueriesDefaultUserAndPassesFilters()
+    public async Task ListAsync_WithFilters_QueriesCurrentUserAndPassesFilters()
     {
         using var cts = new CancellationTokenSource();
         var after = new PhraseCursor(DateTime.UtcNow, Guid.NewGuid());
@@ -120,7 +121,7 @@ public class PhraseServiceTests
 
         await _service.ListAsync(Language.Japanese, "ねこ", after, 10, cts.Token);
 
-        await _repository.Received(1).ListAsync(DefaultUser.Id, 11, Language.Japanese, "ねこ", after, cts.Token);
+        await _repository.Received(1).ListAsync(UserId, 11, Language.Japanese, "ねこ", after, cts.Token);
     }
 
     [Fact]
@@ -131,7 +132,7 @@ public class PhraseServiceTests
         await _service.ListAsync();
 
         await _repository.Received(1).ListAsync(
-            DefaultUser.Id, PhraseService.DefaultPageSize + 1, null, null, null, Arg.Any<CancellationToken>());
+            UserId, PhraseService.DefaultPageSize + 1, null, null, null, Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -145,14 +146,14 @@ public class PhraseServiceTests
         await _service.ListAsync(pageSize: pageSize);
 
         await _repository.Received(1).ListAsync(
-            DefaultUser.Id, expected + 1, null, null, null, Arg.Any<CancellationToken>());
+            UserId, expected + 1, null, null, null, Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task ListAsync_WhenRepositoryReturnsAtMostPageSize_ReturnsLastPage()
     {
-        var newest = Phrase.Create(DefaultUser.Id, Language.Japanese, "日本語", reading: "にほんご");
-        var oldest = Phrase.Create(DefaultUser.Id, Language.English, "Hello");
+        var newest = Phrase.Create(UserId, Language.Japanese, "日本語", reading: "にほんご");
+        var oldest = Phrase.Create(UserId, Language.English, "Hello");
         ArrangeList(newest, oldest);
 
         var page = await _service.ListAsync(pageSize: 2);
@@ -165,7 +166,7 @@ public class PhraseServiceTests
     public async Task ListAsync_WhenRepositoryReturnsExtraRow_DropsItAndPointsCursorAtLastItem()
     {
         var phrases = Enumerable.Range(0, 3)
-            .Select(i => Phrase.Create(DefaultUser.Id, Language.English, $"Phrase {i}"))
+            .Select(i => Phrase.Create(UserId, Language.English, $"Phrase {i}"))
             .ToArray();
         ArrangeList(phrases);
 
@@ -188,18 +189,18 @@ public class PhraseServiceTests
     }
 
     [Fact]
-    public async Task UpdateAsync_WithValidRequest_UpdatesNormalizedContentOfDefaultUser()
+    public async Task UpdateAsync_WithValidRequest_UpdatesNormalizedContentOfCurrentUser()
     {
         var id = Guid.NewGuid();
         using var cts = new CancellationTokenSource();
-        _repository.UpdateAsync(id, DefaultUser.Id, Arg.Any<PhraseContent>(), cts.Token).Returns(true);
+        _repository.UpdateAsync(id, UserId, Arg.Any<PhraseContent>(), cts.Token).Returns(true);
 
         var updated = await _service.UpdateAsync(id, new UpdatePhraseRequest(Language.English, " Hello ", Translation: "Olá"), cts.Token);
 
         updated.Should().BeTrue();
         await _repository.Received(1).UpdateAsync(
             id,
-            DefaultUser.Id,
+            UserId,
             PhraseContent.Create(Language.English, "Hello", translation: "Olá"),
             cts.Token);
     }
@@ -230,11 +231,11 @@ public class PhraseServiceTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task DeleteAsync_DeletesPhraseOfDefaultUserAndReturnsRepositoryResult(bool deleted)
+    public async Task DeleteAsync_DeletesPhraseOfCurrentUserAndReturnsRepositoryResult(bool deleted)
     {
         var id = Guid.NewGuid();
         using var cts = new CancellationTokenSource();
-        _repository.DeleteAsync(id, DefaultUser.Id, cts.Token).Returns(deleted);
+        _repository.DeleteAsync(id, UserId, cts.Token).Returns(deleted);
 
         var result = await _service.DeleteAsync(id, cts.Token);
 

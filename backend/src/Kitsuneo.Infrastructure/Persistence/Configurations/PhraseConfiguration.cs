@@ -19,6 +19,11 @@ public class PhraseConfiguration : IEntityTypeConfiguration<Phrase>
         builder.Property(p => p.UserId)
             .IsRequired();
 
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(p => p.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // Stored as text through the enum convention in AppDbContext
         builder.Property(p => p.Language)
             .IsRequired();
