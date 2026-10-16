@@ -9,7 +9,10 @@ Monorepo do projeto, contendo o frontend em Next.js e o backend em ASP.NET Core.
 ```
 Kitsuneo/
 ├── frontend/                       # Aplicação web (Next.js)
-│   └── src/app/                    # App Router
+│   └── src/
+│       ├── app/                    # App Router: (auth)/login, (auth)/register, (app)/, (app)/phrases, (app)/practice
+│       ├── components/             # Shell autenticado, formulários e componentes de UI
+│       └── lib/                    # Cliente da API, sessão, tipos e áudio
 └── backend/                        # API (ASP.NET Core)
     ├── Kitsuneo.slnx               # Solution
     ├── src/
@@ -18,7 +21,10 @@ Kitsuneo/
     │   ├── Kitsuneo.Core/          # Domínio (entidades, interfaces)
     │   └── Kitsuneo.Infrastructure/ # Acesso a dados e serviços externos
     └── tests/
-        └── Kitsuneo.Core.Tests/    # Testes unitários do domínio (xUnit + FluentAssertions)
+        ├── Kitsuneo.Core.Tests/            # Testes unitários do domínio (xUnit + FluentAssertions)
+        ├── Kitsuneo.Application.Tests/     # Testes dos casos de uso, com repositórios falsos (NSubstitute)
+        ├── Kitsuneo.Infrastructure.Tests/  # Testes de integração com PostgreSQL real (Testcontainers)
+        └── Kitsuneo.API.Tests/             # Testes da API inteira em memória (WebApplicationFactory + Testcontainers)
 ```
 
 ### Dependências entre projetos do backend
@@ -66,14 +72,38 @@ O `docker-compose.yml` sobe o PostgreSQL 18, o backend e o frontend.
 
 ### Segredos
 
-Nenhum dado sensível fica versionado:
+Nenhum dado sensível fica versionado (a única exceção é a chave JWT de desenvolvimento, explicada abaixo):
 
 - **Senha do banco na API:** fica no [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) do .NET (`UserSecretsId: kitsuneo-api`), na chave `Database:Password`. O `appsettings.json` guarda apenas a connection string sem senha.
 - **Senha do contêiner PostgreSQL:** fica no arquivo `.env` da raiz (ignorado pelo git), na variável `POSTGRES_PASSWORD`. Os dois valores devem ser iguais.
 
+- **Chave de assinatura do JWT:** a chave `Jwt:SigningKey`, com pelo menos 32 caracteres. Em `Development` já vem uma chave fixa no `appsettings.Development.json`, só para rodar localmente; ela é pública e não serve fora daí. Para usar outra, defina `Jwt:SigningKey` no user-secrets, que tem prioridade. Fora de `Development` a chave é obrigatória (user-secrets ou variável de ambiente `Jwt__SigningKey`): sem ela a API não sobe e diz o que falta.
 - **Chave do ElevenLabs (voz):** fica no user-secrets da API, na chave `ElevenLabs:ApiKey`. É opcional: sem ela, o resto da API funciona e só o endpoint de áudio responde `503`.
 
 No Docker, o diretório do user-secrets do host é montado como somente leitura no contêiner do backend, que roda em `Development` para carregá-lo.
+
+### Contas e autenticação
+
+Cada usuário tem a própria conta e só vê as próprias frases. Toda a API exige login, exceto `/health` e as rotas de cadastro, login e refresh.
+
+| Rota | O que faz |
+| ---- | --------- |
+| `POST /api/v1/auth/register` | Cria a conta (e-mail e senha de 8 a 128 caracteres) e já faz login |
+| `POST /api/v1/auth/login` | Login com e-mail e senha |
+| `POST /api/v1/auth/refresh` | Troca o refresh token por um novo access token |
+| `POST /api/v1/auth/logout` | Encerra a sessão |
+| `GET /api/v1/auth/me` | Dados do usuário logado |
+
+Como funciona:
+
+- **Senhas:** guardadas só como hash PBKDF2 (HMAC-SHA512, salt aleatório, 100 mil iterações), pelo `PasswordHasher` do ASP.NET Core Identity. Login com e-mail desconhecido ou senha errada dá a mesma resposta (`401`), para não revelar quais e-mails existem.
+- **Access token:** JWT assinado (HS256) que vale 15 minutos. Vai no corpo da resposta e deve ser enviado em `Authorization: Bearer <token>`.
+- **Refresh token:** valor aleatório que vale 14 dias. Vai num cookie `HttpOnly`, `Secure` e `SameSite=Strict`, limitado a `/api/v1/auth`, e no banco fica só o hash dele. A cada refresh ele é trocado por um novo (rotação). Se um refresh token já trocado for usado de novo, é sinal de que vazou, e a sessão inteira é revogada.
+- **Logout e blacklist:** o logout revoga a sessão do refresh token e coloca o access token atual numa blacklist (`revoked_access_tokens`). A blacklist é consultada a cada requisição, até o token expirar. Entradas de tokens já expirados são apagadas automaticamente.
+- **Força bruta:** cadastro, login e refresh aceitam 10 requisições por minuto por IP (`Auth:RateLimitPerMinute`); acima disso, `429`.
+- **CORS:** o frontend em `http://localhost:3000` pode chamar a API com cookies (`Cors:AllowedOrigins`).
+
+A migration `AddUsersAndAuth` apaga as frases criadas antes das contas existirem (com agendas e tentativas), porque elas não tinham dono.
 
 ### Voz com IA (ElevenLabs)
 
@@ -102,6 +132,7 @@ cp .env.example .env
 # edite o .env: defina POSTGRES_PASSWORD e, se necessário, HOST_UID/HOST_GID (id -u / id -g)
 
 # 2. Mesma senha no user-secrets da API
+#    (a chave do JWT de desenvolvimento já vem no appsettings.Development.json)
 dotnet user-secrets set "Database:Password" "<mesma senha do .env>" --project backend/src/Kitsuneo.API
 
 # 3. Subir o ambiente
@@ -127,7 +158,20 @@ npm install
 npm run dev
 ```
 
-Disponível em http://localhost:3000.
+Disponível em http://localhost:3000. Requer o backend rodando.
+
+O servidor do Next.js faz proxy de `/api/v1/*` para o backend (`rewrites` em `next.config.ts`), então o navegador fala só com a origem do frontend e o cookie do refresh token funciona sem CORS. O destino vem da variável `API_URL` (padrão `http://localhost:5243`), lida **no build**: no Docker ela é passada como build arg (`http://backend:8080`).
+
+Telas:
+
+| Rota | O que faz |
+| ---- | --------- |
+| `/login`, `/register` | Entrar ou criar conta |
+| `/` | Resumo do dia: revisões pendentes, frases novas e total salvo |
+| `/practice` | Ditado: ouve a frase (normal ou devagar), escreve, vê a correção palavra a palavra (ou kana a kana) e avalia de 1 a 4 |
+| `/phrases` | Lista com busca, filtro por idioma e paginação; criar, editar, excluir e ouvir frases |
+
+Sessão no navegador: o access token fica só em memória. Ao abrir o app, ele chama `POST /auth/refresh` para recuperar a sessão pelo cookie, e qualquer `401` dispara um refresh e repete a requisição uma vez. Refreshes simultâneos compartilham uma única requisição, porque reusar um refresh token já trocado revoga a sessão inteira. O áudio é baixado com o token (não dá para usar `<audio src>`) e guardado como object URL enquanto a tela está aberta.
 
 ### Backend
 

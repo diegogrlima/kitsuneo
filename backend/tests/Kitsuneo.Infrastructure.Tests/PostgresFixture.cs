@@ -1,3 +1,4 @@
+using Kitsuneo.Core.Entities;
 using Kitsuneo.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -32,6 +33,18 @@ public sealed class PostgresFixture : IAsyncLifetime
             new DbContextOptionsBuilder<AppDbContext>()
                 .UseNpgsql(connectionString.ConnectionString)
                 .Options);
+    }
+
+    /// <summary>Saves a new user and returns its id, for rows that need an owner (phrases, tokens).</summary>
+    public async Task<Guid> CreateUserAsync()
+    {
+        var user = User.Create($"user-{Guid.NewGuid():N}@test.local", "not-a-real-hash");
+
+        await using var context = CreateContext();
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
+
+        return user.Id;
     }
 
     public Task DisposeAsync() => _container.DisposeAsync().AsTask();

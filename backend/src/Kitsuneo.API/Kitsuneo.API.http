@@ -1,8 +1,44 @@
 @Kitsuneo.API_HostAddress = http://localhost:5243
+# The refresh token cookie is Secure: for refresh/logout to send it, use the https profile (https://localhost:7085)
+
+### Auth 1/5: create an account (also logs in)
+POST {{Kitsuneo.API_HostAddress}}/api/v1/auth/register
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "ana@example.com",
+  "password": "correct horse battery"
+}
+
+### Auth 2/5: log in; every request below uses this access token
+# @name login
+POST {{Kitsuneo.API_HostAddress}}/api/v1/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "ana@example.com",
+  "password": "correct horse battery"
+}
+
+### Auth 3/5: who am I
+GET {{Kitsuneo.API_HostAddress}}/api/v1/auth/me
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Accept: application/json
+
+### Auth 4/5: new access token from the refresh token cookie (the cookie is rotated)
+POST {{Kitsuneo.API_HostAddress}}/api/v1/auth/refresh
+Accept: application/json
+
+### Auth 5/5: log out (run last): revokes the session and blacklists the access token
+POST {{Kitsuneo.API_HostAddress}}/api/v1/auth/logout
+Authorization: Bearer {{login.response.body.$.accessToken}}
 
 ### Create an English phrase
 # @name createEnglish
 POST {{Kitsuneo.API_HostAddress}}/api/v1/phrases
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 Accept: application/json
 
@@ -14,6 +50,7 @@ Accept: application/json
 
 ### Create a Japanese phrase with reading
 POST {{Kitsuneo.API_HostAddress}}/api/v1/phrases
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 Accept: application/json
 
@@ -27,18 +64,22 @@ Accept: application/json
 
 ### Get a phrase by id (uses the id returned by the first request)
 GET {{Kitsuneo.API_HostAddress}}/api/v1/phrases/{{createEnglish.response.body.$.id}}
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Accept: application/json
 
 ### List phrases, optionally filtered by language and search term
 GET {{Kitsuneo.API_HostAddress}}/api/v1/phrases?language=Japanese&search=猫
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Accept: application/json
 
 ### List phrases due for review
 GET {{Kitsuneo.API_HostAddress}}/api/v1/reviews/due?limit=20
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Accept: application/json
 
 ### Review a phrase: Again, Hard, Good or Easy (uses the id returned by the first request)
 POST {{Kitsuneo.API_HostAddress}}/api/v1/phrases/{{createEnglish.response.body.$.id}}/reviews
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 Accept: application/json
 
@@ -49,11 +90,13 @@ Accept: application/json
 ### Practice flow 1/3: today's practice (due reviews, then up to 10 new phrases), optionally by language
 # @name today
 GET {{Kitsuneo.API_HostAddress}}/api/v1/practice/today?language=English
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Accept: application/json
 
 ### Practice flow 2/3: submit what was typed for the first phrase of today's practice
 # @name attempt
 POST {{Kitsuneo.API_HostAddress}}/api/v1/phrases/{{today.response.body.$.items[0].phraseId}}/attempts
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 Accept: application/json
 
@@ -66,6 +109,7 @@ Accept: application/json
 
 ### Practice flow 3/3: rate the attempt (Again, Hard, Good or Easy); rating it again returns 409
 POST {{Kitsuneo.API_HostAddress}}/api/v1/attempts/{{attempt.response.body.$.attemptId}}/rating
+Authorization: Bearer {{login.response.body.$.accessToken}}
 Content-Type: application/json
 Accept: application/json
 
@@ -75,6 +119,8 @@ Accept: application/json
 
 ### Listen to a phrase read by the AI voice (MP3; 503 if ElevenLabs:ApiKey is not set)
 GET {{Kitsuneo.API_HostAddress}}/api/v1/phrases/{{today.response.body.$.items[0].phraseId}}/audio
+Authorization: Bearer {{login.response.body.$.accessToken}}
 
 ### Same phrase, slower
 GET {{Kitsuneo.API_HostAddress}}/api/v1/phrases/{{today.response.body.$.items[0].phraseId}}/audio?slow=true
+Authorization: Bearer {{login.response.body.$.accessToken}}

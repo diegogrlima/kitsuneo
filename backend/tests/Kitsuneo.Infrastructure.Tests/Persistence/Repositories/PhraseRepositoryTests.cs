@@ -8,13 +8,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Kitsuneo.Infrastructure.Tests.Persistence.Repositories;
 
-// Each test owns a fresh UserId, so tests never see each other's rows and need no cleanup
+// Each test owns a fresh user, so tests never see each other's rows and need no cleanup
 [Collection(PostgresCollection.Name)]
-public class PhraseRepositoryTests(PostgresFixture fixture)
+public class PhraseRepositoryTests(PostgresFixture fixture) : IAsyncLifetime
 {
     private const int NoLimit = 1000;
 
-    private readonly Guid _userId = Guid.NewGuid();
+    private Guid _userId;
+
+    public async Task InitializeAsync() => _userId = await fixture.CreateUserAsync();
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task ListAsync_WithArchivedPhrase_ExcludesIt()
@@ -33,7 +37,7 @@ public class PhraseRepositoryTests(PostgresFixture fixture)
     public async Task ListAsync_WithPhrasesOfAnotherUser_ReturnsOnlyOwnPhrases()
     {
         var own = NewPhrase("Mine");
-        var others = Phrase.Create(Guid.NewGuid(), Language.English, "Someone else's");
+        var others = Phrase.Create(await fixture.CreateUserAsync(), Language.English, "Someone else's");
         await SeedAsync(own, others);
 
         var phrases = await ListAsync();
@@ -223,7 +227,7 @@ public class PhraseRepositoryTests(PostgresFixture fixture)
     [Fact]
     public async Task UpdateAsync_WithPhraseOfAnotherUser_ReturnsFalseAndLeavesItUnchanged()
     {
-        var others = Phrase.Create(Guid.NewGuid(), Language.English, "Someone else's");
+        var others = Phrase.Create(await fixture.CreateUserAsync(), Language.English, "Someone else's");
         await SeedAsync(others);
 
         var updated = await UpdateAsync(others.Id, PhraseContent.Create(Language.English, "Hijacked"));
@@ -284,7 +288,7 @@ public class PhraseRepositoryTests(PostgresFixture fixture)
     [Fact]
     public async Task DeleteAsync_WithPhraseOfAnotherUser_ReturnsFalseAndKeepsIt()
     {
-        var others = Phrase.Create(Guid.NewGuid(), Language.English, "Someone else's");
+        var others = Phrase.Create(await fixture.CreateUserAsync(), Language.English, "Someone else's");
         await SeedAsync(others);
 
         var result = await DeleteAsync(others.Id);
