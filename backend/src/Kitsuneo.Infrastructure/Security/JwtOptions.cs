@@ -3,7 +3,10 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace Kitsuneo.Infrastructure.Security;
 
-/// <summary>Settings bound from the "Jwt" section. The signing key belongs in user-secrets, never in appsettings.</summary>
+/// <summary>
+/// Settings bound from the "Jwt" section. Outside Development the signing key comes from user-secrets
+/// (or the environment); appsettings.Development.json carries a public key for local runs only.
+/// </summary>
 public sealed class JwtOptions
 {
     public const string SectionName = "Jwt";

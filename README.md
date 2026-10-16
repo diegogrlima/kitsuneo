@@ -69,12 +69,12 @@ O `docker-compose.yml` sobe o PostgreSQL 18, o backend e o frontend.
 
 ### Segredos
 
-Nenhum dado sensível fica versionado:
+Nenhum dado sensível fica versionado (a única exceção é a chave JWT de desenvolvimento, explicada abaixo):
 
 - **Senha do banco na API:** fica no [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) do .NET (`UserSecretsId: kitsuneo-api`), na chave `Database:Password`. O `appsettings.json` guarda apenas a connection string sem senha.
 - **Senha do contêiner PostgreSQL:** fica no arquivo `.env` da raiz (ignorado pelo git), na variável `POSTGRES_PASSWORD`. Os dois valores devem ser iguais.
 
-- **Chave de assinatura do JWT:** fica no user-secrets da API, na chave `Jwt:SigningKey`, com pelo menos 32 caracteres. É obrigatória: sem ela a API não sobe e diz o que falta.
+- **Chave de assinatura do JWT:** a chave `Jwt:SigningKey`, com pelo menos 32 caracteres. Em `Development` já vem uma chave fixa no `appsettings.Development.json`, só para rodar localmente; ela é pública e não serve fora daí. Para usar outra, defina `Jwt:SigningKey` no user-secrets, que tem prioridade. Fora de `Development` a chave é obrigatória (user-secrets ou variável de ambiente `Jwt__SigningKey`): sem ela a API não sobe e diz o que falta.
 - **Chave do ElevenLabs (voz):** fica no user-secrets da API, na chave `ElevenLabs:ApiKey`. É opcional: sem ela, o resto da API funciona e só o endpoint de áudio responde `503`.
 
 No Docker, o diretório do user-secrets do host é montado como somente leitura no contêiner do backend, que roda em `Development` para carregá-lo.
@@ -128,9 +128,9 @@ Voz, modelo e demais opções podem ser trocados na seção `ElevenLabs` da conf
 cp .env.example .env
 # edite o .env: defina POSTGRES_PASSWORD e, se necessário, HOST_UID/HOST_GID (id -u / id -g)
 
-# 2. Mesma senha no user-secrets da API, e uma chave aleatória para assinar os JWT
+# 2. Mesma senha no user-secrets da API
+#    (a chave do JWT de desenvolvimento já vem no appsettings.Development.json)
 dotnet user-secrets set "Database:Password" "<mesma senha do .env>" --project backend/src/Kitsuneo.API
-dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)" --project backend/src/Kitsuneo.API
 
 # 3. Subir o ambiente
 docker compose up -d --build
@@ -159,7 +159,7 @@ Disponível em http://localhost:3000.
 
 ### Backend
 
-Requer o PostgreSQL rodando (por exemplo, `docker compose up -d postgres`) e os user-secrets `Database:Password` e `Jwt:SigningKey` configurados.
+Requer o PostgreSQL rodando (por exemplo, `docker compose up -d postgres`) e o user-secret `Database:Password` configurado.
 
 ```bash
 cd backend
